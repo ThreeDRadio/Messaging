@@ -71,7 +71,13 @@ subheader_font_2 = pango.FontDescription("Sans Bold 11")
             
 #get variables from config file
 config = ConfigParser.SafeConfigParser()
-config.read('/usr/local/etc/threedradio.conf')
+
+# Look for config file in a few places
+configFile = config.read(['/usr/local/etc/threedradio.conf', '/etc/threedradio.conf', 'threedradio.conf'])
+
+if configFile == []:
+    print "Could not find a config file. Giving up!"
+    exit()
 
 #the serialwatch script to be run as a subprocess
 dir_serialwatch = config.get('Paths', 'dir_serialwatch')
