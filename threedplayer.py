@@ -72,11 +72,16 @@ subheader_font_2 = pango.FontDescription("Sans Bold 11")
 #get variables from config file
 config = ConfigParser.SafeConfigParser()
 
-# Look for config file in a few places
+# Look for config file in a few places, can now have a local version for testing.
 configFile = config.read(['/usr/local/etc/threedradio.conf', '/etc/threedradio.conf', 'threedradio.conf'])
 
+
+# Display an error message if we can't find a config file, and exit
 if configFile == []:
     print "Could not find a config file. Giving up!"
+    dialog = gtk.MessageDialog(None, gtk.DIALOG_MODAL, gtk.MESSAGE_ERROR, gtk.BUTTONS_OK, "Could not find a config file.\nPlease report this on the bulletin board.\n\nGiving up!")
+    dialog.set_title("Three D Message Player")
+    dialog.run()
     exit()
 
 #the serialwatch script to be run as a subprocess
