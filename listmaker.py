@@ -4,18 +4,22 @@ listmaker
 search for tracks and add them to a list which can be saved
 as an xxpf file
 '''
-import pygtk
-import gtk
-import gobject
-import pango
-import psycopg2
-import gst
-import pygst
+import datetime
+import pickle
 import threading
 import thread
 import os
 import time
 import ConfigParser
+
+import pygtk
+import gtk
+import gobject
+import pango
+import psycopg2
+import psycopg2.extras
+import gst
+import pygst
 from lxml import etree
 
 #get variables from config file
@@ -34,18 +38,27 @@ pg_password = config.get('Listmaker', 'pg_password')
 pg_server = config.get('Common', 'pg_server')
 pg_cat_database = config.get('Common', 'pg_cat_database')
 
-
+        
 #lists 
 select_items = (
     "cd.title",
+    "cd.artist",
+    "cd.company",
+    "cd.year",
+    "cd.arrivaldate",
+    "cd.demo",
+    "cd.local",
+    "cd.female",
+    "cd.createwho",
+    "cd.createwhen",
+    "cd.comment" ,
     "cdtrack.trackid",
     "cdtrack.cdid",
     "cdtrack.tracknum",
     "cdtrack.tracktitle",
     "cdtrack.trackartist",
-    "cd.artist",
-    "cd.company",
-    "cdtrack.tracklength"
+    "cdtrack.tracklength",
+    "cdcomment.comment  AS cdcomment"
     )
 
 where_items = (
@@ -144,8 +157,6 @@ class Preview_Player:
         
     def get_state(self):
         play_state = self.player.get_state(1)[1]
-        #for item in play_state:
-        #    print(item)
         return play_state
         
     #duration updating func
@@ -287,8 +298,8 @@ class List_Maker():
         self.entry_cat_artist = gtk.Entry(50)
         label_cat_album = gtk.Label("Album")
         self.entry_cat_album = gtk.Entry(50)
-        label_cat_title = gtk.Label("Title")
-        self.entry_cat_title = gtk.Entry(50)
+        label_cat_track = gtk.Label("Track")
+        self.entry_cat_track = gtk.Entry(50)
         label_cat_cmpy = gtk.Label("Company")
         self.entry_cat_cmpy = gtk.Entry(50)
         label_cat_genre = gtk.Label("Genre")
@@ -317,7 +328,7 @@ class List_Maker():
         label_results.set_size_request(80, 30)
 
         #make the list
-        self.store_cat = gtk.TreeStore(str ,str ,str ,str ,str ,str ,str, int)
+        self.store_cat = gtk.TreeStore(str ,str ,str, str)
         self.treeview_cat = gtk.TreeView(self.store_cat)
         self.treeview_cat.set_rules_hint(True)
         treeselection_cat = self.treeview_cat.get_selection()
@@ -379,7 +390,7 @@ class List_Maker():
         btn_saveas.set_tooltip_text("Save this playlist as a new file with a different name")
         
         
-        self.store_pl = gtk.ListStore(str ,str ,str ,str ,str ,str ,str, str)
+        self.store_pl = gtk.ListStore(str ,str ,str ,str)
         self.treeview_pl = gtk.TreeView(self.store_pl)
         self.treeview_pl.set_rules_hint(True)
         treeselection_pl = self.treeview_pl.get_selection()
@@ -409,7 +420,7 @@ class List_Maker():
         self.entry_cat_simple.connect("activate", self.simple_search)
         self.entry_cat_artist.connect("activate", self.advanced_search)
         self.entry_cat_album.connect("activate", self.advanced_search)
-        self.entry_cat_title.connect("activate", self.advanced_search)
+        self.entry_cat_track.connect("activate", self.advanced_search)
         self.entry_cat_cmpy.connect("activate", self.advanced_search)
         self.entry_cat_genre.connect("activate", self.advanced_search)
         self.entry_cat_com.connect("activate", self.advanced_search)       
@@ -424,6 +435,7 @@ class List_Maker():
         btn_save.connect("clicked", self.save)
         btn_saveas.connect("clicked", self.saveas)
         
+        self.treeview_cat.connect('button-press-event' , self.right_click_list_menu)
         ### do the packing ###
 
         hbox_pre_btn.pack_start(self.btn_pre_play_pause, False)
@@ -435,8 +447,8 @@ class List_Maker():
         table_cat.attach(self.entry_cat_artist, 1, 2, 0, 1, False, False, 5, 0)
         table_cat.attach(label_cat_album, 0, 1, 1, 2, False, False, 5, 0)
         table_cat.attach(self.entry_cat_album, 1, 2, 1, 2, False, False, 5, 0)
-        table_cat.attach(label_cat_title, 0, 1, 2, 3, False, False, 5, 0)
-        table_cat.attach(self.entry_cat_title, 1, 2, 2, 3, False, False, 5, 0)
+        table_cat.attach(label_cat_track, 0, 1, 2, 3, False, False, 5, 0)
+        table_cat.attach(self.entry_cat_track, 1, 2, 2, 3, False, False, 5, 0)
         table_cat.attach(label_cat_cmpy, 0, 1, 3, 4, False, False, 5, 0)
         table_cat.attach(self.entry_cat_cmpy, 1, 2, 3, 4, False, False, 5, 0)
         table_cat.attach(label_cat_com, 0, 1, 4, 5, False, False, 5, 0)
@@ -508,163 +520,132 @@ class List_Maker():
         gtk.main()
 
     # columns for the lists
-    def add_cat_columns(self, treeview):        
+    def add_cat_columns(self, treeview):
+        
         #Column ONE
-        column = gtk.TreeViewColumn('Album / Title', gtk.CellRendererText(),
+        column = gtk.TreeViewColumn('Dict', gtk.CellRendererText(),
                                     text=0)
         column.set_sort_column_id(0)
-        #column.set_visible(False)
-        column.set_max_width(360)
-        column.set_resizable(True)
-        treeview.append_column(column)
-        # column TWO
-        column = gtk.TreeViewColumn('Code', gtk.CellRendererText(),
-                                     text=1)
-        column.set_sort_column_id(1)
         column.set_visible(False)
-        treeview.append_column(column)
-
-        # column THREE
-        column = gtk.TreeViewColumn('CD Code/Track No', gtk.CellRendererText(),
-                                    text=2)
-        column.set_sort_column_id(2)
-        column.set_visible(False)
-        treeview.append_column(column)
-
-        # column FOUR
-        column = gtk.TreeViewColumn('Album', gtk.CellRendererText(),
-                                    text=3)
-        column.set_sort_column_id(3)
-        column.set_clickable(False)
-        column.set_resizable(True)
-        column.set_visible(False)
-
-        treeview.append_column(column)
-        
-        #Column FIVE
-        column = gtk.TreeViewColumn('Artist', gtk.CellRendererText(),
-                                    text=4)
-        column.set_sort_column_id(4)
-        column.set_clickable(False)
-        column.set_resizable(True)
         treeview.append_column(column)
                 
-        #Column SIX
-        column = gtk.TreeViewColumn('Company', gtk.CellRendererText(),
-                                    text=5)
-        column.set_sort_column_id(5)
-        column.set_visible(False)
+        #Column TWO
+        column = gtk.TreeViewColumn('Album / Title', gtk.CellRendererText(),
+                                    text=1)
+        column.set_sort_column_id(1)
+        #column.set_resizable(True)
+        column.set_sizing(gtk.TREE_VIEW_COLUMN_FIXED)
+        column.set_fixed_width(240)
         treeview.append_column(column)
-        
-        #Column SEVEN
+       
+        #Column THREE
+        column = gtk.TreeViewColumn('Artist', gtk.CellRendererText(),
+                                    text=2)
+        column.set_sort_column_id(2)
+        column.set_clickable(False)
+        #column.set_resizable(True)
+        column.set_sizing(gtk.TREE_VIEW_COLUMN_FIXED)
+        column.set_fixed_width(240)
+        treeview.append_column(column)
+
+        #Column FOUR
         column = gtk.TreeViewColumn('Time', gtk.CellRendererText(),
-                                    text=6)
-        column.set_sort_column_id(6)
-        #column.set_visible(False)
+                                    text=3)
+        column.set_sort_column_id(3)
+        column.set_sizing(gtk.TREE_VIEW_COLUMN_FIXED)
+        column.set_fixed_width(60)
         treeview.append_column(column)
-        
-        #Column EIGHT
-        column = gtk.TreeViewColumn('TrackTime - int', gtk.CellRendererText(),
-                                    text=7)
-        column.set_sort_column_id(7)
-        column.set_visible(False)
-        treeview.append_column(column) 
         
     def add_pl_columns(self, treeview):
-        column = gtk.TreeViewColumn('Title', gtk.CellRendererText(),
+        # Column ONE
+        column = gtk.TreeViewColumn('Dict', gtk.CellRendererText(),
                                     text=0)
         column.set_sort_column_id(0)
-        #column.set_visible(False)
-        #column.set_max_width(360)
-        column.set_resizable(True)
-        treeview.append_column(column)
-        # column TWO
-        column = gtk.TreeViewColumn('Code', gtk.CellRendererText(),
-                                     text=1)
-        column.set_sort_column_id(1)
         column.set_visible(False)
-        column.set_clickable(False)
-
         treeview.append_column(column)
 
-        # column THREE
-        column = gtk.TreeViewColumn('CD Code/Track No', gtk.CellRendererText(),
+        # Column TWO
+        column = gtk.TreeViewColumn('Title', gtk.CellRendererText(),
+                                    text=1)
+        column.set_sort_column_id(1)
+        column.set_clickable(False)
+        column.set_max_width(360)
+        treeview.append_column(column)
+        
+        # Column THREE
+        column = gtk.TreeViewColumn('Artist', gtk.CellRendererText(),
                                     text=2)
         column.set_sort_column_id(2)
         column.set_visible(False)
+        column.set_clickable(False)
         treeview.append_column(column)
-
-        # column FOUR
-        column = gtk.TreeViewColumn('Album', gtk.CellRendererText(),
+        
+        # Column FOUR
+        column = gtk.TreeViewColumn('Time', gtk.CellRendererText(),
                                     text=3)
         column.set_sort_column_id(3)
         column.set_clickable(False)
-        column.set_resizable(True)
-        column.set_visible(False)
-
         treeview.append_column(column)
         
-        #Column FIVE
-        column = gtk.TreeViewColumn('Artist', gtk.CellRendererText(),
-                                    text=4)
-        column.set_sort_column_id(4)
-        column.set_clickable(False)
-        column.set_resizable(True)
-        column.set_visible(False)
-
-        treeview.append_column(column)
-                
-        #Column SIX
-        column = gtk.TreeViewColumn('Company', gtk.CellRendererText(),
-                                    text=5)
-        column.set_sort_column_id(5)
-        column.set_visible(False)
-        treeview.append_column(column)
-        
-        #Column SEVEN
-        column = gtk.TreeViewColumn('Time', gtk.CellRendererText(),
-                                    text=6)
-        column.set_sort_column_id(6)
-        column.set_clickable(False)
-        treeview.append_column(column)
-        
-        #Column EIGHT
-        column = gtk.TreeViewColumn('TrackTime - int', gtk.CellRendererText(),
-                                    text=7)
-        column.set_sort_column_id(7)
-        column.set_visible(False)
-        treeview.append_column(column) 
-
     # dnd    
     def cat_drag_data_get_data(self, treeview, context, selection, target_id,
                            etime):
         treeselection = treeview.get_selection()
         model, iter = treeselection.get_selected()
-        tuple_data = model.get(iter, 0, 1, 2, 3, 4, 5, 6, 7)
-        str_data = str(tuple_data).strip('[]')
-        selection.set(gtk.gdk.SELECTION_TYPE_STRING, 8, str_data)
+        
+        #if the tracklength column is ("", ) then the CD has been selected, 
+        tracklength = model.get(iter, 3)
+        if not tracklength[0]:
+            pickle_data = ""
+        else:
+            pickle_data = model.get(iter, 0)
+            pickle_data = pickle_data[0]
+            
+        selection.set(gtk.gdk.SELECTION_TYPE_STRING, 8, pickle_data)
+
 
     def pl_drag_data_get_data(self, treeview, context, selection, target_id,
                            etime):
         treeselection = treeview.get_selection()
         model, iter = treeselection.get_selected()
-        datatuple = model.get(iter, 0, 1, 2, 3, 4, 5, 6, 7)
-        datastring = str(datatuple).strip('[]')
-        selection.set(gtk.gdk.SELECTION_TYPE_STRING, 8, datastring)
+        
+
+        pickle_data = model.get(iter, 0)
+        pickle_data = pickle_data[0]
+            
+        selection.set(gtk.gdk.SELECTION_TYPE_STRING, 8, pickle_data)
         model.remove(iter)
         
     def drag_data_received_data(self, treeview, context, x, y, selection,
                                 info, etime):
         model = treeview.get_model()
-        str_data = selection.get_text()       
-        tuple_data = eval(str_data)
-        list_data = list(tuple_data)
-        track_id = list_data[1]
-        int_time = list_data[7]
-        ID = list_data[2]
-
-        if track_id and  int_time:
+        pickle_data = selection.get_text()
+        if not pickle_data:
+            str_error = ("Oops, did you just try to add an entire CD to the list?")
+            self.error_dialog(str_error)
+            return
+            
+        dict_data = pickle.loads(pickle_data)
+        #track_id = dict_data['trackid']
+        int_time = dict_data['tracklength']
+        tracktime = self.convert_time(int_time)
+        #cd_code = str(format(item[2], '07d'))
+        #track_no = str(format(item[3], '02d'))
+        cd_code = str(format(dict_data['cdid'], '07d'))
+        track_no = str(format(dict_data['tracknum'], '02d'))
+        tracktitle = dict_data['tracktitle']
+        trackartist = dict_data['trackartist']
+        artist = dict_data['artist']
+        if not trackartist:
+            trackartist = artist
+            
+        list_data = (pickle_data, tracktitle, trackartist, tracktime)
+        ID = cd_code + "-" + track_no
+        print(ID)
+        print int_time
+        if ID and  int_time:
             filepath = self.get_filepath(ID)
+            print(filepath)
             if not filepath:
                 str_error = "Unable to add to the list, file does not exist. That track has probably not yet been ripped into the music store"
                 self.error_dialog(str_error) 
@@ -690,19 +671,18 @@ class List_Maker():
                 self.update_time_total()
                 self.changed = True
                     
-        else:
-            str_error = "Unable to add to the list. That track has probably not yet been ripped into the music store"
-            self.error_dialog(str_error)
+        #else:
+        #    str_error = "Oops, I can't do that! Did you select a track or an album"
+        #    self.error_dialog(str_error)
 
-
+    
         return
 
     # music catalogue section       
     def pg_connect_cat(self):
         conn_string = 'dbname={0} user={1} host={2} password={3}'.format (
-            pg_cat_database, pg_user, pg_server, pg_password)
+                pg_cat_database, pg_user, pg_server, pg_password)
         conn = psycopg2.connect(conn_string)
-        #cur = conn.cursor()
         return conn
 
     def simple_search(self, widget):
@@ -721,16 +701,23 @@ class List_Maker():
                                 
     def query_simple(self):    
         str_error_none = "No search terms were entered"
-        str_error_len = "Please enter more than three characters in your search"
+        str_error_len = "Please enter more than one character in your search"
             
         searchitem = self.entry_cat_simple.get_text()
+                    
         if not searchitem:
             self.error_dialog(str_error_none)
             return False
             
-        if len(searchitem) < 3:
+        if len(searchitem) < 2:
             self.error_dialog(str_error_len)
             return False
+        
+        searchitem = '%' + searchitem + '%'
+        searchitems = []
+        
+        for item in where_items:
+            searchitems.append(searchitem)
         
         conn = self.pg_connect_cat()
 
@@ -740,10 +727,10 @@ class List_Maker():
 
         str_select = str_select.rstrip(", ")
 
-        str_from = " from cdtrack inner JOIN cd on cdtrack.cdid=cd.id "
+        str_from = " from cdtrack inner JOIN cd on cdtrack.cdid=cd.id LEFT JOIN cdcomment on cd.id=cdcomment.cdid "
         str_where = "where "
         for s in where_items:
-            str_where = str_where + s + " ilike '%" + searchitem + "%' or "
+            str_where = str_where + s + " ILIKE %s or "
 
         str_where = str_where.rstrip(" or ")
         str_order = "order by cd.title, cdtrack.tracknum "
@@ -751,10 +738,10 @@ class List_Maker():
 
         query = str_select + str_from + str_where + str_order + str_limit
 
-        cur = conn.cursor()
-        cur.execute(query)
-        result = cur.fetchall()
-        cur.close()
+        dict_cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        dict_cur.execute(query, searchitems)
+        result = dict_cur.fetchall()
+        dict_cur.close()
         conn.close()
         
         return result
@@ -768,44 +755,49 @@ class List_Maker():
             self.warn_dialog(str_warn)
 
     def add_to_cat_store(self, result):
+
         self.clear_cat_list()
         var_album = ""
         for item in result:
             model = self.treeview_cat.get_model()
-            album = item[0]
-            track_id = str(item[1])
-            cd_code = str(format(item[2], '07d'))
-            track_no = str(format(item[3], '02d'))
+            item_dict = {}
+            
+            '''
+            for s in select_items:
+                s = s.split(".")[1]
+                item_dict[s] = item[s]
+            '''
+            keylist = list(item.keys())
+            for key in keylist:
+                item_dict[key] = item[key]
+            
+            
+            pickle_list = pickle.dumps(item_dict)
+            album = item['title']
+            track_id = str(item['trackid'])
+            cd_code = str(format(item['cdid'], '07d'))
+            track_no = str(format(item['tracknum'], '02d'))
             cd_track_code =  cd_code + "-" + track_no
-            title = item[4]
-            if item[5]:
-                artist = item[5]
+            title = item['tracktitle']
+            artist = item['artist']
+            if item['trackartist']:
+                trackartist = item['trackartist']
             else:
-                artist = item[6]
-            company = item[7]
-            int_time = item[8]
+                trackartist = item['artist']
+            
+            int_time = item['tracklength']
             dur_time = self.convert_time(int_time)
             
             if not album:
                 album = "(No Title)"
 
-            
+            #print (album, trackartist, dur_time)
             if not album == var_album:                
-                n = model.append(None, [album, None, None, None, artist, None, None, 0])
-                model.append(n, [title, track_id, cd_track_code, album, artist, company, dur_time, int_time])
+                n = model.append(None, [pickle_list, album, artist, ""])
+                model.append(n, [pickle_list, title, trackartist, dur_time])
             else:
-                model.append(n, [title, track_id, cd_track_code, album, artist, company, dur_time, int_time])
+                model.append(n, [pickle_list, title, trackartist, dur_time])
             var_album = album
-            
-
-            '''
-            if not album == var_album:                
-                n = model.append(None, [album, None, None, None, None, None, None, 0])
-                model.append(n, [title, track_id, cd_track_code, album, artist, company, dur_time, int_time])
-            else:
-                model.append(n, [title, track_id, cd_track_code, album, artist, company, dur_time, int_time])
-            var_album = album
-            '''
 
     def advanced_search(self, widget):
         result = self.query_adv()
@@ -822,92 +814,122 @@ class List_Maker():
         self.update_result_label(int_res, simple)
     
     def query_adv(self):
-        #obtain text from entries and combos
+        #obtain text from entries and combos and add to parameter dictionary
+        parameters = {}
+        
         artist = self.entry_cat_artist.get_text()
+        if artist:
+            artist = self.add_percent(artist)
+            parameters['artist'] = artist
+            q_artist = "(cd.artist ILIKE %(artist)s OR cdtrack.trackartist ILIKE %(artist)s) AND "
+        else:
+            q_artist = None
+            
         album = self.entry_cat_album.get_text()
-        title = self.entry_cat_title.get_text()
+        if album:
+            album = self.add_percent(album)
+            parameters['album'] = album
+            q_album = "cd.title ILIKE %(album)s AND "
+        else:
+            q_album = None
+            
+        track = self.entry_cat_track.get_text()
+        if track:
+            track = self.add_percent(track)
+            parameters['track'] = track
+            q_track = "cdtrack.tracktitle ILIKE %(track)s AND "
+        else:
+            q_track = None            
+            
         company = self.entry_cat_cmpy.get_text()
+        if company:
+            company = self.add_percent(company)
+            parameters['company'] = company
+            q_company = "cd.company ILIKE %(company)s AND "
+        else:
+            q_company = None
+                        
         comments = self.entry_cat_com.get_text()
+        if comments:
+            comments = self.add_percent(comments)
+            parameters['comments'] = comments
+            q_comments = "cdcomment.comment ILIKE %(comments)s AND "
+        else:
+            q_comments = None
+                                
         genre = self.entry_cat_genre.get_text()
+        if genre:
+            genre = self.add_percent(genre)
+            parameters['genre'] = genre
+            q_genre = "cd.genre ILIKE %(genre)s AND "
+        else:
+            q_genre = None
+                        
         created_by = self.cb_cat_creator.get_active_text()
         if created_by:
             ls_creator = created_by.split(',')
             created_by = ls_creator[0]
+            parameters['created_by'] = created_by
+            q_created_by = "cd.createwho = %(created_by)s AND "
+        else:
+            q_created_by = None
+                        
         compil = self.chk_cat_comp.get_active()
-        demo = self.chk_cat_demo .get_active()
-        local = self.chk_cat_local.get_active()
-        female = self.chk_cat_fem.get_active()
-        #query according to the text
-        
-        str_error_none = "No search terms were entered"
-        str_error_len = "Please enter more than three characters in your search"
-        
-        if not artist and not album and not title and not company and not comments and not genre:
-            self.error_dialog(str_error_none)
-            return False
-            
-        for item in (artist, album, title, company, comments, genre):
-            if item:
-                if len(item) < 3:
-                    self.error_dialog(str_error_len)
-                    return False
-        
-        if artist:
-            q_artist = "(cd.artist ILIKE '%" + artist + "%' OR cdtrack.trackartist ILIKE '%" + artist + "%') AND "
-        else:
-            q_artist = None
-        if album:
-            q_album = "cd.title ILIKE '%" + album + "%' AND "
-        else:
-            q_album = None
-        if title:
-            q_title = "cdtrack.tracktitle ILIKE '%" + title + "%' AND "
-        else:
-            q_title = None
-        if company:
-            q_company = "cd.company ILIKE '%" + company + "%' AND "
-        else:
-            q_company = None
-        if comments:
-            q_comments = "cdcomment.comment ILIKE '%" + comments + "%' AND "
-        else:
-            q_comments = None
-        if genre:
-            q_genre = "cd.genre ILIKE '%" + genre + "%' AND "
-        else:
-            q_genre = None
-        if created_by:
-            q_created_by = "cd.createwho = " + created_by + " AND "
-        else:
-            q_created_by = None        
         if compil:
+            parameters['compil'] = compil
             q_compil = "cd.compilation = 2 AND "
         else:
             q_compil = None
+                        
+        demo = self.chk_cat_demo .get_active()
         if demo:
+            parameters['demo'] = demo
             q_demo = "cd.demo = 2 AND "
         else:
             q_demo = None
+
+        local = self.chk_cat_local.get_active()
         if local:
+            parameters['local'] = local
             q_local = "cd.local = 2 AND "
         else:
             q_local = None
+
+        female = self.chk_cat_fem.get_active()
         if female:
+            parameters['female'] = female
             q_female = "cd.female = 2 AND "
         else:
             q_female = None
         
+
+        #query according to the text
+        
+        str_error_none = "No search terms were entered"
+        str_error_len = "Please enter more than one character in your search"
+        
+        if not artist and not album and not track and not company and not comments and not genre:
+            self.error_dialog(str_error_none)
+            return False
+            
+        for item in (artist, album, track, company, comments, genre):
+            if item:
+                if len(item) < 2:
+                    self.error_dialog(str_error_len)
+                    return False
+                    
+
         str_select = "SELECT "
         for s in select_items:    
             str_select = str_select + s + ", "        
         str_select = str_select.rstrip(", ")
-        str_from = " FROM cdtrack INNER JOIN cd ON cdtrack.cdid=cd.id "
+        str_from = " FROM cdtrack INNER JOIN cd ON cdtrack.cdid=cd.id LEFT JOIN cdcomment on cd.id=cdcomment.cdid "
         str_where = "WHERE "
         
         adv_var = (
             q_artist,
             q_album,
-            q_title,
+            q_track,
             q_company,
             q_comments,
             q_genre,
@@ -930,21 +952,28 @@ class List_Maker():
         query = str_select + str_from + str_where + str_order + str_limit        
 
         conn = self.pg_connect_cat()
-        cur = conn.cursor()
-        cur.execute(query)
-        result = cur.fetchall()
-        cur.close()
-        conn.close()        
+        dict_cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+        dict_cur.execute(query, parameters)
+        result = dict_cur.fetchall()
+        
+        dict_cur.close()
+        conn.close()   
         
         return result
+
+    def add_percent(self, parameter):
+        l = ('%', parameter, '%')
+        percented = ''.join(l)
+        return percented
 
     def get_creator(self):
         query = "SELECT DISTINCT cd.createwho, users.first, users.last FROM cd JOIN users ON cd.createwho = users.id ORDER BY users.last"
         conn = self.pg_connect_cat()
-        cur = conn.cursor()
-        cur.execute(query)
-        list_creator = cur.fetchall()
-        cur.close()
+        dict_cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        dict_cur.execute(query)
+        list_creator = dict_cur.fetchall()
+        dict_cur.close()
         conn.close()
         return list_creator
 
@@ -993,14 +1022,20 @@ class List_Maker():
     def get_sel_filepath(self):
         treeselection = self.treeview_cat.get_selection()
         model, iter = treeselection.get_selected()
-        ID = model.get(iter, 2)
-        ID = ID[0]
+        pickle_list = model.get(iter, 0)
+        pickle_list = pickle_list[0]
+        data_list = pickle.loads(pickle_list)
+        ID = data_list['cdid']
+        tracknum = data_list['tracknum']
+        ID = str(ID).zfill(7) + "-" + str(tracknum).zfill(2)
+        print(ID)
         filepath = self.get_filepath(ID)
         if not filepath:
             str_error = "Unable to play, file does not exist. That track has probably not yet been ripped into the music store"
             self.error_dialog(str_error)
             return
         else: 
+            print("Filepath is: " + filepath)
             return filepath
 
     def play_pause_clicked(self, widget):
@@ -1039,7 +1074,9 @@ class List_Maker():
         iter = model.get_iter_first()
         total_time = 0
         while iter:
-            int_time = model.get_value(iter, 7)
+            pickle_data = model.get_value(iter, 0)
+            dict_data = pickle.loads(pickle_data)
+            int_time = dict_data['tracklength']
             int_time = int(int_time)
             total_time = total_time + int_time
             iter = model.iter_next(iter)
@@ -1388,6 +1425,141 @@ class List_Maker():
 
 
     #common functions
+    def right_click_list_menu(self, treeview, event):
+        if event.button == 3: # right click
+            selection = treeview.get_selection()
+            #print(selection)
+            model, iter = selection.get_selected()
+            pickle_data = model.get(iter, 0)
+            artist = model.get(iter, 2)[0]
+            #print(pickle_data)
+            pickle_data = pickle_data[0]
+            dict_data = pickle.loads(pickle_data)
+            details = (dict_data, artist)
+            menu = self.create_context_menu(details)
+            menu.popup( None, None, None, event.button, event.get_time())
+
+    def create_context_menu(self, details):
+        context_menu = gtk.Menu()
+        details_item = gtk.MenuItem( "Details")
+        details_item.connect( "activate", self.show_details, details)
+        details_item.show()
+        play_item = gtk.MenuItem("Play")
+        play_item.show()
+        context_menu.append(details_item)
+        #context_menu.append(play_item)
+        return context_menu
+        
+    def show_details(self, w, details):
+        dialog = gtk.Dialog("Details", None, 0, (
+            gtk.STOCK_OK, gtk.RESPONSE_OK))
+        
+        dict_data, artist = details
+        
+        label_artist = gtk.Label()
+        label_artist.set_alignment(0, 0.5)
+        label_artist.set_text("Artist: " + artist)
+        dialog.vbox.pack_start(label_artist, True, True, 0)
+                
+        label_album = gtk.Label()
+        album = dict_data['title']
+        label_album.set_text("Album: " + album)
+        label_album.set_alignment(0, 0.5)
+        dialog.vbox.pack_start(label_album, True, True, 0)
+                
+        label_track = gtk.Label()
+        track = dict_data['tracktitle']
+        label_track.set_text("Track: " + track)
+        label_track.set_alignment(0, 0.5)
+        dialog.vbox.pack_start(label_track, True, True, 0)
+                
+        label_company = gtk.Label()
+        label_company.set_alignment(0, 0.5)
+        company = dict_data['company']
+        label_company.set_text("Company: " + company)
+        dialog.vbox.pack_start(label_company, True, True, 0)
+                
+        label_year = gtk.Label()
+        label_year.set_alignment(0, 0.5)
+        year = dict_data['year']
+        year = str(year)
+        print(year)
+        #year = (datetime.datetime.fromtimestamp(year).strftime('%Y'))
+        label_year.set_text("Release Year: " + year) 
+        dialog.vbox.pack_start(label_year, True, True, 0) 
+                
+        label_arrivaldate = gtk.Label()
+        label_arrivaldate.set_alignment(0, 0.5)
+        arrivaldate = dict_data['arrivaldate']
+        arrivaldate = str(arrivaldate)
+        label_arrivaldate.set_text("date arrived: " + arrivaldate)
+        dialog.vbox.pack_start(label_arrivaldate, True, True, 0)
+                
+        label_demo = gtk.Label()
+        label_demo.set_alignment(0, 0.5)
+        demo = dict_data['demo']
+        if demo==1:
+            demo = "no"
+        elif demo==2:
+            demo = "yes"
+        else:
+            demo = "unknown"
+        label_demo.set_text("Demo: " + demo)
+        dialog.vbox.pack_start(label_demo, True, True, 0) 
+        
+        label_local = gtk.Label()
+        label_local.set_alignment(0, 0.5)
+        local = dict_data['local']
+        if local==1:
+            local = "no"
+        elif local==2:
+            local = "yes"
+        elif local==3:
+            local = "some"
+        else:
+            local = "unknown"        
+        label_local.set_text("local: " + local)
+        dialog.vbox.pack_start(label_local, True, True, 0)
+        
+        
+        label_female = gtk.Label()
+        label_female.set_alignment(0, 0.5)
+        female = dict_data['female']
+        if female==1:
+            female = "no"
+        elif female==2:
+            female = "yes"
+        elif female==3:
+            female = "some"
+        else:
+            female = "unknown"
+        dialog.vbox.pack_start(label_female, True, True, 0)        
+        label_female.set_text("Female: " + female)
+
+        cdcomment = dict_data['cdcomment']
+        if cdcomment:
+            label_cdcomment = gtk.Label()
+            label_cdcomment.set_alignment(0, 0.5)
+            label_cdcomment.set_line_wrap(True)
+            label_cdcomment.set_text("Comment: " + cdcomment)
+            hs = gtk.HSeparator()
+            dialog.vbox.pack_start(hs, True, True, 0)
+            dialog.vbox.pack_start(label_cdcomment, True, True, 0)
+            
+        comment = dict_data['comment']
+        if comment:        
+            label_comment = gtk.Label()
+            label_comment.set_alignment(0, 0.5)   
+            label_comment.set_line_wrap(True)         
+            label_comment.set_text("Comment: " + comment)        
+            hs = gtk.HSeparator()
+            dialog.vbox.pack_start(hs, True, True, 0)
+            dialog.vbox.pack_start(label_cdcomment, True, True, 0)
+
+        dialog.show_all()
+        dialog.run()    
+        dialog.destroy()        
+        
     def convert_time(self, dur):
         s = int(dur)
         m,s = divmod(s, 60)
@@ -1404,7 +1576,7 @@ class List_Maker():
         filename = ID + ".mp3"
         dir_cd = ID[0:-3] + "/"
         filepath = dir_mus + dir_cd + filename
-        print(filepath)
+        #print(filepath)
         if not os.path.isfile(filepath):
             return False
         else:
