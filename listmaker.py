@@ -237,13 +237,12 @@ class List_Maker():
         
         
         ###   create containers - boxes and scrolled windows  ###        
-        #hpane to hold playlist and search panes
-        #hpane = gtk.HPaned()
+
         # hbox for music catalogue
         hbox_cat = gtk.HBox(False, 5)
         # vbox for catalogue search
         vbox_cat_search = gtk.VBox(False, 5)
-        # table for music catalogue search
+        # table for catalogue search
         table_cat = gtk.Table(20, 2, False)
         # hbox for catalogue creator selection
         hbox_cat_creator = gtk.HBox(False, 5)
@@ -318,7 +317,7 @@ class List_Maker():
         self.chk_cat_demo = gtk.CheckButton("Demo", True)
         self.chk_cat_local = gtk.CheckButton("Local", True)       
         self.chk_cat_fem = gtk.CheckButton("Female", True)
-        label_cat_order = gtk.Label("Order by")
+        label_cat_order = gtk.Label("Order results by:")
         self.cb_cat_order = gtk.combo_box_new_text()
         self.cb_order_add()
         btn_cat_adv = gtk.Button("Search")
@@ -404,7 +403,8 @@ class List_Maker():
         label_time_0 = gtk.Label("Playlist Total Time - ")
         self.label_time_1 = gtk.Label("00:00  ")
 
-        ### dnd and connections ###
+        ### dnd ###
+        
         self.treeview_cat.enable_model_drag_source(gtk.gdk.BUTTON1_MASK, 
                                               [("copy-row", 0, 0)], 
                                               gtk.gdk.ACTION_COPY)
@@ -417,6 +417,7 @@ class List_Maker():
         self.treeview_pl.connect("drag_data_get", self.pl_drag_data_get_data)
         self.treeview_pl.connect("drag_data_received",
                               self.drag_data_received_data)
+        ### connections ###
 
         self.window.connect("delete_event", self.delete_event)
         self.window.connect("destroy", self.destroy)
@@ -440,7 +441,9 @@ class List_Maker():
         btn_save.connect("clicked", self.save)
         btn_saveas.connect("clicked", self.saveas)
         
-        self.treeview_cat.connect('button-press-event' , self.right_click_list_menu)
+        self.treeview_cat.connect('button-press-event' , self.right_click_cat_list_menu)
+        self.treeview_pl.connect('button-press-event' , self.right_click_pl_list_menu)
+                
         ### do the packing ###
 
         hbox_pre_btn.pack_start(self.btn_pre_play_pause, False)
@@ -460,8 +463,7 @@ class List_Maker():
         table_cat.attach(self.entry_cat_com, 1, 2, 4, 5, False, False, 5, 0)
         table_cat.attach(label_cat_genre, 0, 1, 5, 6, False, False, 5, 0)
         table_cat.attach(self.entry_cat_genre, 1, 2, 5, 6, False, False, 5, 0)
-        
-        
+                
         hbox_cat_creator.pack_start(label_cat_creator, False)
         hbox_cat_creator.pack_start(self.cb_cat_creator, False)
         hbox_cat_order.pack_start(label_cat_order, False)
@@ -474,26 +476,22 @@ class List_Maker():
         vbox_cat_search.pack_start(self.label_result_simple, False)
         vbox_cat_search.pack_start(sep_cat_1, False)
         vbox_cat_search.pack_start(label_cat_adv, False)
-        
-        vbox_cat_search.pack_start(table_cat, False)
-        
+        vbox_cat_search.pack_start(table_cat, False)        
         vbox_cat_search.pack_start(hbox_cat_creator, False)
-        
         vbox_cat_search.pack_start(self.chk_cat_comp, False)
         vbox_cat_search.pack_start(self.chk_cat_demo, False)
         vbox_cat_search.pack_start(self.chk_cat_local, False)
-        vbox_cat_search.pack_start(self.chk_cat_fem, False)
-        #vbox_cat_search.pack_start(hbox_cat_order, False)   
-        vbox_cat_search.pack_start(btn_cat_adv, False)
-        #vbox_cat_search.pack_start(self.entry_cat_adv, False)  
+        vbox_cat_search.pack_start(self.chk_cat_fem, False) 
+        vbox_cat_search.pack_start(hbox_cat_order, False)
+        vbox_cat_search.pack_start(btn_cat_adv, False) 
         vbox_cat_search.pack_start(self.label_result_adv, False)
+
         sw_cat_lst.add(self.treeview_cat)
         sw_pl.add(self.treeview_pl)   
+
         vbox_cat_lst.pack_start(label_results, False)
         vbox_cat_lst.pack_start(sw_cat_lst, True)
         vbox_cat_lst.pack_start(hbox_pre_btn, False)
-
-
 
         hbox_pl_time.pack_end(self.label_time_1, False)
         hbox_pl_time.pack_end(label_time_0, False)
@@ -511,9 +509,7 @@ class List_Maker():
         hbox_cat.pack_start(vbox_cat_search, False)  
         hbox_cat.pack_start(vbox_cat_lst, True) 
         hbox_cat.pack_start(vbox_pl, False)  
-        #hpane.pack1(hbox_cat, False, False)
-        #hpane.pack2(vbox_pl, False, False)
-        #window.add(hpane)
+
         self.window.add(hbox_cat)
         self.window.show_all()
         
@@ -523,7 +519,6 @@ class List_Maker():
         self.pl3d_file = None
 
         gtk.main()
-
 
     def add_cat_columns(self, treeview):
         '''
@@ -621,7 +616,6 @@ class List_Maker():
             
         selection.set(gtk.gdk.SELECTION_TYPE_STRING, 8, pickle_data)
 
-
     def pl_drag_data_get_data(self, treeview, context, selection, target_id,
                            etime):
         '''
@@ -665,8 +659,8 @@ class List_Maker():
             
         list_data = (pickle_data, tracktitle, trackartist, tracktime)
         ID = cd_code + "-" + track_no
-        print(ID)
-        print int_time
+        #print(ID)
+        #print int_time
         if ID and  int_time:
             filepath = self.get_filepath(ID)
             print(filepath)
@@ -1012,10 +1006,11 @@ class List_Maker():
       return model[active][0]
 
     def cb_order_add(self):
-        list_order = ["Artist Alphabetical",
-            "Album Alphabetical",
-            "Most recent first",
-            "Oldest First"]
+        list_order = ["Oldest Songs First",
+            "Most Recent First",
+            "Artist Alphabetical",
+            "Album Alphabetical"
+                     ]
         for item in list_order:
             self.cb_cat_order.append_text(item)
         self.cb_cat_order.set_active(0)
@@ -1037,6 +1032,31 @@ class List_Maker():
             self.label_result_adv.set_text("")
             self.label_result_simple.set_text("")
 
+    def right_click_cat_list_menu(self, treeview, event):
+        if event.button == 3: # right click
+            selection = treeview.get_selection()
+            #print(selection)
+            model, iter = selection.get_selected()
+            pickle_data = model.get(iter, 0)
+            artist = model.get(iter, 2)[0]
+            #print(pickle_data)
+            pickle_data = pickle_data[0]
+            dict_data = pickle.loads(pickle_data)
+            details = (dict_data, artist)
+            menu = self.create_context_cat_menu(details)
+            menu.popup( None, None, None, event.button, event.get_time())
+
+    def create_context_cat_menu(self, details):
+        context_menu = gtk.Menu()
+        details_item = gtk.MenuItem( "Details")
+        details_item.connect( "activate", self.show_details, details)
+        details_item.show()
+        play_item = gtk.MenuItem("Play")
+        play_item.show()
+        context_menu.append(details_item)
+        #context_menu.append(play_item)
+        return context_menu
+  
     # preview section  
     def get_sel_filepath(self):
         treeselection = self.treeview_cat.get_selection()
@@ -1086,7 +1106,6 @@ class List_Maker():
         self.player_pre.set_updateable_progress(True)
         self.player_pre.set_place_in_file(self.hscale_pre.get_value())
     
-
     # playlist section
     def update_time_total(self):
         model = self.treeview_pl.get_model()
@@ -1232,8 +1251,9 @@ class List_Maker():
         iter = model.get_iter_first()
         ls_tracklist = []
         while iter:
-            row = model.get(iter, 0, 1, 2, 3, 4, 5, 7)
-            ls_tracklist.append(row)
+            pickle_tr = model.get(iter, 0)[0]
+            dict_tr = pickle.loads(pickle_tr)
+            ls_tracklist.append(dict_tr)
             iter = model.iter_next(iter)
 
         return ls_tracklist
@@ -1272,13 +1292,13 @@ class List_Maker():
             self.save(None)
         dialog.destroy()
 
-        
     def open_pl(self, filename):
         if filename:
             ls_tracklist = self.pl3d2pylist(filename)
             model = self.treeview_pl.get_model()
             model.clear()
             for item in ls_tracklist:
+                
                 title = item[0]
                 
                 #identifier is the track ID within a URL
@@ -1305,8 +1325,10 @@ class List_Maker():
                 if duration:
                     int_dur = int(duration)/1000
                     str_dur = self.convert_time(int_dur)
+                    
+                pickle_tr = item[7]
                 
-                row = (title, track_id, ID, album, creator, company, str_dur, int_dur)
+                row = (pickle_tr, title, artist, str_dur)
                 model.append(row)
             
             self.update_time_total()
@@ -1355,6 +1377,7 @@ class List_Maker():
         trackList = etree.SubElement(playlist, ns + "trackList")
 
         for ls_track in ls_tracklist:
+            pickle_tr = pickle.dumps(ls_track)
             track = etree.SubElement(trackList, ns + "track")        
             title = etree.SubElement(track, ns + "title")
             identifier = etree.SubElement(track, ns + "identifier")
@@ -1363,14 +1386,16 @@ class List_Maker():
             creator = etree.SubElement(track, ns + "creator")
             annotation = etree.SubElement(track, ns + "annotation")
             duration = etree.SubElement(track, ns + "duration")
+            everything = etree.SubElement(track, ns + "everything")
      
-            title.text = ls_track[0]
-            identifier.text = ls_track[1]                        
-            location.text = ls_track[2]
-            album.text = ls_track[3]
-            creator.text = ls_track[4]
-            annotation.text = ls_track[5]
-            duration.text = str(int(ls_track[6])*1000)
+            title.text = ls_track["title"]
+            identifier.text = str(ls_track["trackid"])
+            location.text = str(ls_track["cdid"]) + "-" + str(ls_track["tracknum"])
+            album.text = ls_track["title"]
+            creator.text = ls_track["artist"]
+            annotation.text = ls_track["company"]
+            duration.text = str(int(ls_track["tracklength"])*1000)
+            everything.text = pickle_tr
 
         pl3dfile = etree.tostring(playlist, pretty_print=True)
         doc = etree.ElementTree(playlist)
@@ -1434,17 +1459,15 @@ class List_Maker():
                 str_album, 
                 str_creator, 
                 str_annotation, 
-                str_duration
+                str_duration,
+                str_everything
                 )
                 
             ls_tracklist.append(tp_track)
             
         return ls_tracklist
 
-
-
-    #common functions
-    def right_click_list_menu(self, treeview, event):
+    def right_click_pl_list_menu(self, treeview, event):
         if event.button == 3: # right click
             selection = treeview.get_selection()
             #print(selection)
@@ -1455,10 +1478,10 @@ class List_Maker():
             pickle_data = pickle_data[0]
             dict_data = pickle.loads(pickle_data)
             details = (dict_data, artist)
-            menu = self.create_context_menu(details)
+            menu = self.create_context_pl_menu(details)
             menu.popup( None, None, None, event.button, event.get_time())
 
-    def create_context_menu(self, details):
+    def create_context_pl_menu(self, details):
         context_menu = gtk.Menu()
         details_item = gtk.MenuItem( "Details")
         details_item.connect( "activate", self.show_details, details)
@@ -1468,7 +1491,9 @@ class List_Maker():
         context_menu.append(details_item)
         #context_menu.append(play_item)
         return context_menu
-        
+
+    #common functions
+
     def show_details(self, w, details):
         dialog = gtk.Dialog("Details", None, 0, (
             gtk.STOCK_OK, gtk.RESPONSE_OK))
@@ -1502,7 +1527,7 @@ class List_Maker():
         label_year.set_alignment(0, 0.5)
         year = dict_data['year']
         year = str(year)
-        print(year)
+        #print(year)
         #year = (datetime.datetime.fromtimestamp(year).strftime('%Y'))
         label_year.set_text("Release Year: " + year) 
         dialog.vbox.pack_start(label_year, True, True, 0) 
@@ -1616,7 +1641,6 @@ class List_Maker():
         messagedialog.run()
         messagedialog.destroy()  
 
-    
 lm = List_Maker()
 lm.main()
         
