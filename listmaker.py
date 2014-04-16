@@ -214,7 +214,9 @@ class Preview_Player:
         self.reset_playbutton()
 
 class List_Maker():
-    
+    '''
+    Main Gui and functions for listmaker
+    '''
     def delete_event(self, widget, event, data=None):
         return False
 
@@ -222,6 +224,9 @@ class List_Maker():
         gtk.main_quit()
 
     def main(self):
+        '''
+        define the layout of the interface
+        '''
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL) 
         self.window.set_position(gtk.WIN_POS_CENTER)
         filepath_logo = dir_img + logo
@@ -519,9 +524,13 @@ class List_Maker():
 
         gtk.main()
 
-    # columns for the lists
+
     def add_cat_columns(self, treeview):
-        
+        '''
+        Four columns to list the details of the search results. 
+        The first hidden column contains a pickle of a dictionary with the 
+        full query results.
+        '''
         #Column ONE
         column = gtk.TreeViewColumn('Dict', gtk.CellRendererText(),
                                     text=0)
@@ -557,6 +566,11 @@ class List_Maker():
         treeview.append_column(column)
         
     def add_pl_columns(self, treeview):
+        '''   
+        Four columns to list the details of tracks in the playlist. 
+        The first hidden column contains a pickle of a dictionary with the 
+        full query results.
+        '''
         # Column ONE
         column = gtk.TreeViewColumn('Dict', gtk.CellRendererText(),
                                     text=0)
@@ -590,9 +604,13 @@ class List_Maker():
     # dnd    
     def cat_drag_data_get_data(self, treeview, context, selection, target_id,
                            etime):
+        '''
+        copy text from the first hidden column of the selected row in the 
+        search results list for drag n drop
+        '''
         treeselection = treeview.get_selection()
         model, iter = treeselection.get_selected()
-        
+
         #if the tracklength column is ("", ) then the CD has been selected, 
         tracklength = model.get(iter, 3)
         if not tracklength[0]:
@@ -606,9 +624,12 @@ class List_Maker():
 
     def pl_drag_data_get_data(self, treeview, context, selection, target_id,
                            etime):
+        '''
+        copy text from the first hidden column of the selected row in the 
+        playlist for drag n drop
+        '''                               
         treeselection = treeview.get_selection()
         model, iter = treeselection.get_selected()
-        
 
         pickle_data = model.get(iter, 0)
         pickle_data = pickle_data[0]
@@ -618,6 +639,9 @@ class List_Maker():
         
     def drag_data_received_data(self, treeview, context, x, y, selection,
                                 info, etime):
+        '''
+        drop the copied text into a new row in the playlist for drag n drop
+        '''
         model = treeview.get_model()
         pickle_data = selection.get_text()
         if not pickle_data:
@@ -671,11 +695,6 @@ class List_Maker():
                 self.update_time_total()
                 self.changed = True
                     
-        #else:
-        #    str_error = "Oops, I can't do that! Did you select a track or an album"
-        #    self.error_dialog(str_error)
-
-    
         return
 
     # music catalogue section       
