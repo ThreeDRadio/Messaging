@@ -20,6 +20,7 @@ import psycopg2
 import psycopg2.extras
 import gst
 import pygst
+import magic
 from lxml import etree
 
 #get variables from config file
@@ -1127,32 +1128,24 @@ class List_Maker():
         filename = dialog.get_filename()
         sfx = ".pl3d"
         
-        if not filename[-5:] == sfx:
-            filename = filename + sfx
+
    
         if response == gtk.RESPONSE_OK:
-            self.open_pl(filename)
-            basename = os.path.basename(filename)
-            title = basename[:-5]
-            self.window.set_title(title)
-            self.changed = False
+            if not filename[-5:] == sfx:
+                filename = filename + sfx
+                return filename
+                dialog.destroy()
+
             
         elif response == gtk.RESPONSE_ACCEPT:
-            basename = os.path.basename(filename)
-            title = basename[:-5]
-            self.window.set_title(title)
-            try:
-                self.save_pl(filename)
-                self.changed = False
-            except IOError:
-                str_error = '''
-        It looks like you are trying to overwrite 
-        somebody else's playlist.
-
-        Not Allowed!'''
-                self.error_dialog(str_error)
-
-        dialog.destroy()
+            if not filename[-5:] == sfx:
+                filename = filename + sfx
+                return filename
+                dialog.destroy()
+                
+        elif response == gtk.RESPONSE_CANCEL:
+            return None
+            dialog.destroy()
 
     def info_row(self, widget):    
         treeselection = self.treeview_pl.get_selection()
@@ -1213,7 +1206,7 @@ class List_Maker():
         iter = model.get_iter_first()
         ls_tracklist = []
         while iter:
-            row = model.get(iter, 0, 1, 2, 3, 4, 5, 7)
+            row = model.get(iter, 0)
             ls_tracklist.append(row)
             iter = model.iter_next(iter)
 
@@ -1228,7 +1221,14 @@ class List_Maker():
         action = "open_file"
         if self.changed:
             self.save_change()
-        self.get_filename(action, None)
+        filename = self.get_filename(action, None)
+
+        if filename:
+            basename = os.path.basename(filename)
+            title = basename[:-5]
+            self.window.set_title(title)
+            self.changed = False
+            self.open_pl(filename)
 
     def save_change(self):
         dialog = gtk.Dialog("Save List?", None, 0, 
@@ -1253,8 +1253,35 @@ class List_Maker():
             self.save(None)
         dialog.destroy()
 
-        
     def open_pl(self, filename):
+        ms = magic.open(magic.NONE)
+        ms.load()
+        ft = ms.file(filename)
+        if ft:
+            if ft == "XML document text":
+                self.open_pl_xml
+            else:
+                #load the pickle etc etc
+                f = open(filename)
+                ls_data = pickle.load(f)
+                f.close()
+                model = treeview.get_model()
+                for pickle_data in ls_data:
+                    dict_data = pickle.loads(pickle_data)
+                    int_time = dict_data['tracklength']
+                    tracktime = self.convert_time(int_time)
+                    tracktitle = dict_data['tracktitle']
+                    trackartist = dict_data['trackartist']
+                    if not trackartist:
+                        artist = dict_data['artist']
+                        trackartist = artist
+                        
+                    model.append((pickle_data, tracktitle, trackartist, tracktime))
+        
+    def open_pl_xml(self, filename):
+        '''
+        open the deprecated playlist
+        '''    
         if filename:
             ls_tracklist = self.pl3d2pylist(filename)
             model = self.treeview_pl.get_model()
@@ -1294,26 +1321,39 @@ class List_Maker():
             self.pl3d_file = filename
                         
     def save(self, widget):
+        '''
+        save the file. First check that it is not a new file.
+        '''
         if self.pl3d_file:
-            filename = self.pl3d_file
+            filename = self.pl3d_file      
             ls_tracklist = self.get_tracklist()
-            doc = self.pylist2pl3d(ls_tracklist)
-            try:
-                doc.write(filename, pretty_print=True)
-                self.Saved = True
-            except IOError:
-                self.saveas(None) 
-                self.Saved = True
+            pickle.dump(ls_tracklist, open("filename", "wb"))
 
         else:
             action = "save_file"
-            self.get_filename(action, 'Untitled.pl3d')
-            
+            filename = self.get_filename(action, 'Untitled.pl3d')
+            if filename: 
+                ls_tracklist = self.get_tracklist()
+                try: 
+                    pickle.dump(ls_tracklist, open("filename", "wb"))
+                    self.changed = False
+                    
+                except IOError:
+                    str_error = '''
+                    It looks like you are trying to overwrite 
+                    somebody else's playlist.
+
+                    Not Allowed!'''
+                    self.error_dialog(str_error)
+                                   
     def saveas(self, widget):
         action = "save_file"
         name = "Untitled.pl3d"
-        self.get_filename(action, name)
-        
+        filename = self.get_filename(action, name)
+        if filename: 
+            ls_tracklist = self.get_tracklist()
+            pickle.dump(ls_tracklist, open("filename", "wb"))
+            
     def save_pl(self, filename):
         '''
         Called from the get_filename function to do the saving of the 
@@ -1325,37 +1365,7 @@ class List_Maker():
         self.pl3d_file = filename
         self.Saved = True
                 
-    def pylist2pl3d(self, ls_tracklist):
-        '''
-        write the track information in the list to a pl3d file
-        '''
-        pl3d_ns = "http://xspf.org/ns/0/"
-        ns = "{%s}" % pl3d_ns
-        pl3d_nsmap = {None : pl3d_ns}
-        playlist = etree.Element(ns + "playlist", version="1.0", nsmap=pl3d_nsmap)
-        trackList = etree.SubElement(playlist, ns + "trackList")
 
-        for ls_track in ls_tracklist:
-            track = etree.SubElement(trackList, ns + "track")        
-            title = etree.SubElement(track, ns + "title")
-            identifier = etree.SubElement(track, ns + "identifier")
-            location = etree.SubElement(track, ns + "location")
-            album = etree.SubElement(track, ns + "album")
-            creator = etree.SubElement(track, ns + "creator")
-            annotation = etree.SubElement(track, ns + "annotation")
-            duration = etree.SubElement(track, ns + "duration")
-     
-            title.text = ls_track[0]
-            identifier.text = ls_track[1]                        
-            location.text = ls_track[2]
-            album.text = ls_track[3]
-            creator.text = ls_track[4]
-            annotation.text = ls_track[5]
-            duration.text = str(int(ls_track[6])*1000)
-
-        pl3dfile = etree.tostring(playlist, pretty_print=True)
-        doc = etree.ElementTree(playlist)
-        return doc
 
     def pl3d2pylist(self, filename):
         '''
