@@ -1125,27 +1125,29 @@ class List_Maker():
         dialog.add_filter(filter)
 
         response = dialog.run()
-        filename = dialog.get_filename()
+
         sfx = ".pl3d"
         
 
-   
         if response == gtk.RESPONSE_OK:
+            filename = dialog.get_filename()
             if not filename[-5:] == sfx:
                 filename = filename + sfx
-                return filename
-                dialog.destroy()
-
-            
+            dialog.destroy()
+            return filename
+                      
         elif response == gtk.RESPONSE_ACCEPT:
+            filename = dialog.get_filename()
+
             if not filename[-5:] == sfx:
                 filename = filename + sfx
-                return filename
-                dialog.destroy()
+                
+            dialog.destroy()
+            return filename
                 
         elif response == gtk.RESPONSE_CANCEL:
-            return None
             dialog.destroy()
+            return None
 
     def info_row(self, widget):    
         treeselection = self.treeview_pl.get_selection()
@@ -1222,6 +1224,7 @@ class List_Maker():
         if self.changed:
             self.save_change()
         filename = self.get_filename(action, None)
+        print(filename)
 
         if filename:
             basename = os.path.basename(filename)
@@ -1332,6 +1335,7 @@ class List_Maker():
         else:
             action = "save_file"
             filename = self.get_filename(action, 'Untitled.pl3d')
+            print(filename)
             if filename: 
                 ls_tracklist = self.get_tracklist()
                 try: 
@@ -1350,6 +1354,7 @@ class List_Maker():
         action = "save_file"
         name = "Untitled.pl3d"
         filename = self.get_filename(action, name)
+        print(filename)
         if filename: 
             ls_tracklist = self.get_tracklist()
             pickle.dump(ls_tracklist, open("filename", "wb"))
@@ -1365,8 +1370,6 @@ class List_Maker():
         self.pl3d_file = filename
         self.Saved = True
                 
-
-
     def pl3d2pylist(self, filename):
         '''
         convert the information in an pl3d file to a python list
@@ -1431,7 +1434,6 @@ class List_Maker():
             ls_tracklist.append(tp_track)
             
         return ls_tracklist
-
 
 
     #common functions
