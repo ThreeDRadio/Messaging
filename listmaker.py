@@ -284,52 +284,42 @@ class List_Maker():
 
         ### ----------------Music Catalogue Search ---------------- ###
         
-        label_cat = gtk.Label(" Music Catalogue ")
-        label_cat.modify_font(header_font)        
+        label_search = gtk.Label(" Music Catalogue ")
+        label_search.modify_font(header_font)        
         sep_cat_0 = gtk.HSeparator()
-        label_cat_simple = gtk.Label("Simple Search")
-        label_cat_simple.modify_font(subheader_font_1)
-        self.entry_cat_simple = gtk.Entry(50)
-        btn_cat_simple = gtk.Button("Search")
-        btn_cat_simple.set_tooltip_text("Simple search")
-        btn_cat_simple.set_size_request(80, 30)
-        self.label_result_simple = gtk.Label()
-        self.label_result_simple.set_size_request(80, 40)
-        sep_cat_1 = gtk.HSeparator()
-        label_cat_adv = gtk.Label("Advanced Search")
-        label_cat_adv.modify_font(subheader_font_1)
-        label_cat_artist = gtk.Label("Artist")
-        self.entry_cat_artist = gtk.Entry(50)
-        label_cat_album = gtk.Label("Album")
-        self.entry_cat_album = gtk.Entry(50)
-        label_cat_track = gtk.Label("Track")
-        self.entry_cat_track = gtk.Entry(50)
-        label_cat_cmpy = gtk.Label("Company")
-        self.entry_cat_cmpy = gtk.Entry(50)
-        label_cat_genre = gtk.Label("Genre")
-        self.entry_cat_genre = gtk.Entry(50)        
-        label_cat_com = gtk.Label("Comments")
-        self.entry_cat_com = gtk.Entry(50)
-        label_cat_creator = gtk.Label("Created by")
-        self.cb_cat_creator = gtk.combo_box_new_text()
+        label_search = gtk.Label("Search for Songs")
+        label_search.modify_font(subheader_font_1)
+        label_search_artist = gtk.Label("Artist")
+        self.entry_search_artist = gtk.Entry(50)
+        label_search_album = gtk.Label("Album")
+        self.entry_search_album = gtk.Entry(50)
+        label_search_track = gtk.Label("Track")
+        self.entry_search_track = gtk.Entry(50)
+        label_search_cmpy = gtk.Label("Company")
+        self.entry_search_cmpy = gtk.Entry(50)
+        label_search_genre = gtk.Label("Genre")
+        self.entry_search_genre = gtk.Entry(50)        
+        label_search_com = gtk.Label("Comments")
+        self.entry_search_com = gtk.Entry(50)
+        label_search_creator = gtk.Label("Created by")
+        self.cb_search_creator = gtk.combo_box_new_text()
         self.cb_creator_add()       
-        self.chk_cat_comp = gtk.CheckButton("Compilation", True)
-        self.chk_cat_demo = gtk.CheckButton("Demo", True)
-        self.chk_cat_local = gtk.CheckButton("Local", True)       
-        self.chk_cat_fem = gtk.CheckButton("Female", True)
-        label_cat_order = gtk.Label("Order by")
+        self.chk_search_comp = gtk.CheckButton("Compilation", True)
+        self.chk_search_demo = gtk.CheckButton("Demo", True)
+        self.chk_search_local = gtk.CheckButton("Local", True)       
+        self.chk_search_fem = gtk.CheckButton("Female", True)
+        label_search_order = gtk.Label("Order by")
         self.cb_cat_order = gtk.combo_box_new_text()
         self.cb_order_add()
-        btn_cat_adv = gtk.Button("Search")
-        btn_cat_adv.set_tooltip_text("Advanced Search")
-        self.label_result_adv = gtk.Label()
-        self.label_result_adv.set_size_request(80, 40)
+        btn_search = gtk.Button("Search")
+        self.label_search_result = gtk.Label()
+        self.label_search_result.set_size_request(80, 40)
 
         ### ----------- Search Results Section -----------###
 
         label_results = gtk.Label("Search Results")
         label_results.modify_font(subheader_font_1)
-        label_results.set_size_request(80, 30)
+        #label_results.set_size_request(80, 30)
 
         #make the list
         self.store_cat = gtk.TreeStore(str ,str ,str, str)
@@ -420,15 +410,15 @@ class List_Maker():
         self.window.connect("delete_event", self.delete_event)
         self.window.connect("destroy", self.destroy)
         treeselection_cat.connect('changed', self.cat_selection_changed)
-        btn_cat_simple.connect("clicked", self.simple_search)
-        self.entry_cat_simple.connect("activate", self.simple_search)
-        self.entry_cat_artist.connect("activate", self.advanced_search)
-        self.entry_cat_album.connect("activate", self.advanced_search)
-        self.entry_cat_track.connect("activate", self.advanced_search)
-        self.entry_cat_cmpy.connect("activate", self.advanced_search)
-        self.entry_cat_genre.connect("activate", self.advanced_search)
-        self.entry_cat_com.connect("activate", self.advanced_search)       
-        btn_cat_adv.connect("clicked", self.advanced_search)
+        #btn_cat_simple.connect("clicked", self.simple_search)
+        #self.entry_search_simple.connect("activate", self.simple_search)
+        self.entry_search_artist.connect("activate", self.search_catalogue)
+        self.entry_search_album.connect("activate", self.search_catalogue)
+        self.entry_search_track.connect("activate", self.search_catalogue)
+        self.entry_search_cmpy.connect("activate", self.search_catalogue)
+        self.entry_search_genre.connect("activate", self.search_catalogue)
+        self.entry_search_com.connect("activate", self.search_catalogue)       
+        btn_search.connect("clicked", self.search_catalogue)
         self.btn_pre_play_pause.connect("clicked", self.play_pause_clicked)
         btn_pre_stop.connect("clicked", self.on_stop_clicked)
         self.hscale_pre.connect("button-release-event", self.on_seek_changed)
@@ -447,45 +437,45 @@ class List_Maker():
         hbox_pre_btn.pack_start(self.hscale_pre, True)
         hbox_pre_btn.pack_start(self.label_pre_time, True)   
 
-        table_cat.attach(label_cat_artist, 0, 1, 0, 1, False, False, 5, 0)
-        table_cat.attach(self.entry_cat_artist, 1, 2, 0, 1, False, False, 5, 0)
-        table_cat.attach(label_cat_album, 0, 1, 1, 2, False, False, 5, 0)
-        table_cat.attach(self.entry_cat_album, 1, 2, 1, 2, False, False, 5, 0)
-        table_cat.attach(label_cat_track, 0, 1, 2, 3, False, False, 5, 0)
-        table_cat.attach(self.entry_cat_track, 1, 2, 2, 3, False, False, 5, 0)
-        table_cat.attach(label_cat_cmpy, 0, 1, 3, 4, False, False, 5, 0)
-        table_cat.attach(self.entry_cat_cmpy, 1, 2, 3, 4, False, False, 5, 0)
-        table_cat.attach(label_cat_com, 0, 1, 4, 5, False, False, 5, 0)
-        table_cat.attach(self.entry_cat_com, 1, 2, 4, 5, False, False, 5, 0)
-        table_cat.attach(label_cat_genre, 0, 1, 5, 6, False, False, 5, 0)
-        table_cat.attach(self.entry_cat_genre, 1, 2, 5, 6, False, False, 5, 0)
+        table_cat.attach(label_search_artist, 0, 1, 0, 1, False, False, 5, 0)
+        table_cat.attach(self.entry_search_artist, 1, 2, 0, 1, False, False, 5, 0)
+        table_cat.attach(label_search_album, 0, 1, 1, 2, False, False, 5, 0)
+        table_cat.attach(self.entry_search_album, 1, 2, 1, 2, False, False, 5, 0)
+        table_cat.attach(label_search_track, 0, 1, 2, 3, False, False, 5, 0)
+        table_cat.attach(self.entry_search_track, 1, 2, 2, 3, False, False, 5, 0)
+        table_cat.attach(label_search_cmpy, 0, 1, 3, 4, False, False, 5, 0)
+        table_cat.attach(self.entry_search_cmpy, 1, 2, 3, 4, False, False, 5, 0)
+        table_cat.attach(label_search_com, 0, 1, 4, 5, False, False, 5, 0)
+        table_cat.attach(self.entry_search_com, 1, 2, 4, 5, False, False, 5, 0)
+        table_cat.attach(label_search_genre, 0, 1, 5, 6, False, False, 5, 0)
+        table_cat.attach(self.entry_search_genre, 1, 2, 5, 6, False, False, 5, 0)
         
         
-        hbox_cat_creator.pack_start(label_cat_creator, False)
-        hbox_cat_creator.pack_start(self.cb_cat_creator, False)
-        hbox_cat_order.pack_start(label_cat_order, False)
+        hbox_cat_creator.pack_start(label_search_creator, False)
+        hbox_cat_creator.pack_start(self.cb_search_creator, False)
+        hbox_cat_order.pack_start(label_search_order, False)
         hbox_cat_order.pack_start(self.cb_cat_order, False)
 
         vbox_cat_search.pack_start(sep_cat_0, False)
-        vbox_cat_search.pack_start(label_cat_simple, False)
-        vbox_cat_search.pack_start(self.entry_cat_simple, False)
-        vbox_cat_search.pack_start(btn_cat_simple, False)
-        vbox_cat_search.pack_start(self.label_result_simple, False)
-        vbox_cat_search.pack_start(sep_cat_1, False)
-        vbox_cat_search.pack_start(label_cat_adv, False)
+        #vbox_cat_search.pack_start(label_search_simple, False)
+        #vbox_cat_search.pack_start(self.entry_search_simple, False)
+        #vbox_cat_search.pack_start(btn_cat_simple, False)
+        #vbox_cat_search.pack_start(self.label_result_simple, False)
+        #vbox_cat_search.pack_start(sep_cat_1, False)
+        vbox_cat_search.pack_start(label_search, False)
         
         vbox_cat_search.pack_start(table_cat, False)
         
         vbox_cat_search.pack_start(hbox_cat_creator, False)
         
-        vbox_cat_search.pack_start(self.chk_cat_comp, False)
-        vbox_cat_search.pack_start(self.chk_cat_demo, False)
-        vbox_cat_search.pack_start(self.chk_cat_local, False)
-        vbox_cat_search.pack_start(self.chk_cat_fem, False)
+        vbox_cat_search.pack_start(self.chk_search_comp, False)
+        vbox_cat_search.pack_start(self.chk_search_demo, False)
+        vbox_cat_search.pack_start(self.chk_search_local, False)
+        vbox_cat_search.pack_start(self.chk_search_fem, False)
         #vbox_cat_search.pack_start(hbox_cat_order, False)   
-        vbox_cat_search.pack_start(btn_cat_adv, False)
-        #vbox_cat_search.pack_start(self.entry_cat_adv, False)  
-        vbox_cat_search.pack_start(self.label_result_adv, False)
+        vbox_cat_search.pack_start(btn_search, False)
+        #vbox_cat_search.pack_start(self.entry_search_adv, False)  
+        vbox_cat_search.pack_start(self.label_search_result, False)
         sw_cat_lst.add(self.treeview_cat)
         sw_pl.add(self.treeview_pl)   
         vbox_cat_lst.pack_start(label_results, False)
@@ -690,67 +680,7 @@ class List_Maker():
         conn = psycopg2.connect(conn_string)
         return conn
 
-    def simple_search(self, widget):
-        result = self.query_simple()
-        simple = True
-        if result:
-            self.length_check(result)
-            self.add_to_cat_store(result)
-            int_res = len(result)
-           
-        else:
-            self.clear_cat_list()
-            int_res = 0
-        
-        self.update_result_label(int_res, simple)
-                                
-    def query_simple(self):    
-        str_error_none = "No search terms were entered"
-        str_error_len = "Please enter more than one character in your search"
-            
-        searchitem = self.entry_cat_simple.get_text()
-                    
-        if not searchitem:
-            self.error_dialog(str_error_none)
-            return False
-            
-        if len(searchitem) < 2:
-            self.error_dialog(str_error_len)
-            return False
-        
-        searchitem = '%' + searchitem + '%'
-        searchitems = []
-        
-        for item in where_items:
-            searchitems.append(searchitem)
-        
-        conn = self.pg_connect_cat()
-
-        str_select = "SELECT "
-        for s in select_items:    
-            str_select = str_select + s + ", "
-
-        str_select = str_select.rstrip(", ")
-
-        str_from = " from cdtrack inner JOIN cd on cdtrack.cdid=cd.id LEFT JOIN cdcomment on cd.id=cdcomment.cdid "
-        str_where = "where "
-        for s in where_items:
-            str_where = str_where + s + " ILIKE %s or "
-
-        str_where = str_where.rstrip(" or ")
-        str_order = "order by cd.title, cdtrack.tracknum "
-        str_limit = "LIMIT " + str(query_limit)
-
-        query = str_select + str_from + str_where + str_order + str_limit
-
-        dict_cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-        dict_cur.execute(query, searchitems)
-        result = dict_cur.fetchall()
-        dict_cur.close()
-        conn.close()
-        
-        return result
-
+    
     def length_check(self, result):
         if len(result) == query_limit:
             str_warn_0 = "Warning - your query returned "
@@ -759,6 +689,7 @@ class List_Maker():
             str_warn = str_warn_0 + str(query_limit) + str_warn_1 + str(query_limit) + str_warn_2
             self.warn_dialog(str_warn)
 
+    
     def add_to_cat_store(self, result):
 
         self.clear_cat_list()
@@ -805,9 +736,8 @@ class List_Maker():
                 model.append(n, [pickle_list, title, trackartist, dur_time])
             var_album = album
 
-    def advanced_search(self, widget):
+    def search_catalogue(self, widget):
         result = self.query_adv()
-        simple = False
         if result:
             self.length_check(result)
             self.add_to_cat_store(result)
@@ -816,14 +746,15 @@ class List_Maker():
         else:
             self.clear_cat_list()
             int_res = 0
-            
-        self.update_result_label(int_res, simple)
+        
+        self.update_result_label(int_res)
+
     
     def query_adv(self):
         #obtain text from entries and combos and add to parameter dictionary
         parameters = {}
         
-        artist = self.entry_cat_artist.get_text()
+        artist = self.entry_search_artist.get_text()
         if artist:
             artist = self.add_percent(artist)
             parameters['artist'] = artist
@@ -831,7 +762,7 @@ class List_Maker():
         else:
             q_artist = None
             
-        album = self.entry_cat_album.get_text()
+        album = self.entry_search_album.get_text()
         if album:
             album = self.add_percent(album)
             parameters['album'] = album
@@ -839,7 +770,7 @@ class List_Maker():
         else:
             q_album = None
             
-        track = self.entry_cat_track.get_text()
+        track = self.entry_search_track.get_text()
         if track:
             track = self.add_percent(track)
             parameters['track'] = track
@@ -847,7 +778,7 @@ class List_Maker():
         else:
             q_track = None            
             
-        company = self.entry_cat_cmpy.get_text()
+        company = self.entry_search_cmpy.get_text()
         if company:
             company = self.add_percent(company)
             parameters['company'] = company
@@ -855,7 +786,7 @@ class List_Maker():
         else:
             q_company = None
                         
-        comments = self.entry_cat_com.get_text()
+        comments = self.entry_search_com.get_text()
         if comments:
             comments = self.add_percent(comments)
             parameters['comments'] = comments
@@ -863,7 +794,7 @@ class List_Maker():
         else:
             q_comments = None
                                 
-        genre = self.entry_cat_genre.get_text()
+        genre = self.entry_search_genre.get_text()
         if genre:
             genre = self.add_percent(genre)
             parameters['genre'] = genre
@@ -871,7 +802,7 @@ class List_Maker():
         else:
             q_genre = None
                         
-        created_by = self.cb_cat_creator.get_active_text()
+        created_by = self.cb_search_creator.get_active_text()
         if created_by:
             ls_creator = created_by.split(',')
             created_by = ls_creator[0]
@@ -880,28 +811,28 @@ class List_Maker():
         else:
             q_created_by = None
                         
-        compil = self.chk_cat_comp.get_active()
+        compil = self.chk_search_comp.get_active()
         if compil:
             parameters['compil'] = compil
             q_compil = "cd.compilation = 2 AND "
         else:
             q_compil = None
                         
-        demo = self.chk_cat_demo .get_active()
+        demo = self.chk_search_demo .get_active()
         if demo:
             parameters['demo'] = demo
             q_demo = "cd.demo = 2 AND "
         else:
             q_demo = None
 
-        local = self.chk_cat_local.get_active()
+        local = self.chk_search_local.get_active()
         if local:
             parameters['local'] = local
             q_local = "cd.local = 2 AND "
         else:
             q_local = None
 
-        female = self.chk_cat_fem.get_active()
+        female = self.chk_search_fem.get_active()
         if female:
             parameters['female'] = female
             q_female = "cd.female = 2 AND "
@@ -988,8 +919,8 @@ class List_Maker():
         list_creator = self.get_creator()
         for item in list_creator:
             str_creator = str(item[0]) + ", " + item[1] + " " + item[2]
-            self.cb_cat_creator.append_text(str_creator)
-        self.cb_cat_creator.prepend_text("")
+            self.cb_search_creator.append_text(str_creator)
+        self.cb_search_creator.prepend_text("")
 
     def get_order(self):
       model = self.cb_cat_order.get_model()
@@ -1011,18 +942,15 @@ class List_Maker():
         model = self.treeview_cat.get_model()
         model.clear()
 
-    def update_result_label(self, int_res, simple):
+
+    def update_result_label(self, int_res):
         if int_res < 200 :
             str_results = "Your search returned {0} results".format(int_res)
-            if simple:
-                self.label_result_simple.set_text(str_results)
-                self.label_result_adv.set_text("")
-            else:
-                self.label_result_adv.set_text(str_results)
-                self.label_result_simple.set_text("")  
+            self.label_search_result.set_text(str_results)
+
         else:
-            self.label_result_adv.set_text("")
-            self.label_result_simple.set_text("")
+            self.label_search_result.set_text("")
+
 
     # preview section  
     def get_sel_filepath(self):
@@ -1456,7 +1384,6 @@ class List_Maker():
             details = self.get_details(model, iter)
             menu = self.create_context_menu(details)
             menu.popup( None, None, None, event.button, event.get_time())
-
             
     def get_details(self, model, iter):
         pickle_data = model.get(iter, 0)
