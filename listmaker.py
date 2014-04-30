@@ -309,7 +309,7 @@ class List_Maker():
         self.chk_search_local = gtk.CheckButton("Local", True)       
         self.chk_search_fem = gtk.CheckButton("Female", True)
         label_search_order = gtk.Label("Order by")
-        self.cb_cat_order = gtk.combo_box_new_text()
+        self.cb_search_order = gtk.combo_box_new_text()
         self.cb_order_add()
         btn_search = gtk.Button("Search")
         self.label_search_result = gtk.Label()
@@ -454,7 +454,7 @@ class List_Maker():
         hbox_cat_creator.pack_start(label_search_creator, False)
         hbox_cat_creator.pack_start(self.cb_search_creator, False)
         hbox_cat_order.pack_start(label_search_order, False)
-        hbox_cat_order.pack_start(self.cb_cat_order, False)
+        hbox_cat_order.pack_start(self.cb_search_order, False)
 
         vbox_cat_search.pack_start(sep_cat_0, False)
         #vbox_cat_search.pack_start(label_search_simple, False)
@@ -472,7 +472,7 @@ class List_Maker():
         vbox_cat_search.pack_start(self.chk_search_demo, False)
         vbox_cat_search.pack_start(self.chk_search_local, False)
         vbox_cat_search.pack_start(self.chk_search_fem, False)
-        #vbox_cat_search.pack_start(hbox_cat_order, False)   
+        vbox_cat_search.pack_start(hbox_cat_order, False)   
         vbox_cat_search.pack_start(btn_search, False)
         #vbox_cat_search.pack_start(self.entry_search_adv, False)  
         vbox_cat_search.pack_start(self.label_search_result, False)
@@ -737,7 +737,7 @@ class List_Maker():
             var_album = album
 
     def search_catalogue(self, widget):
-        result = self.query_adv()
+        result = self.query_catalogue()
         if result:
             self.length_check(result)
             self.add_to_cat_store(result)
@@ -750,7 +750,7 @@ class List_Maker():
         self.update_result_label(int_res)
 
     
-    def query_adv(self):
+    def query_catalogue(self):
         #obtain text from entries and combos and add to parameter dictionary
         parameters = {}
         
@@ -863,7 +863,7 @@ class List_Maker():
         str_from = " FROM cdtrack INNER JOIN cd ON cdtrack.cdid=cd.id LEFT JOIN cdcomment on cd.id=cdcomment.cdid "
         str_where = "WHERE "
         
-        adv_var = (
+        q_var = (
             q_artist,
             q_album,
             q_track,
@@ -877,13 +877,27 @@ class List_Maker():
             q_female,
             )
             
-        for item in adv_var:
+        for item in q_var:
             if item:
                 str_where = str_where + item
       
         str_where = str_where.rstrip("AND ")
         
-        str_order = " ORDER BY cd.title, cdtrack.tracknum "
+        order_by = self.cb_search_order.get_active()
+        if order_by == 0:
+            order_by = "cd.year DESC, "
+        
+        elif order_by == 1:
+            order_by = "cd.year, "
+        
+        elif order_by ==2:
+            order_by = "cdtrack.trackartist, cd.artist, "
+            
+        elif order_by == 3:
+            order_by = "cd.title, "
+
+        
+        str_order = " ORDER BY " + order_by + "cd.title , cdtrack.tracknum "
         str_limit = "LIMIT " + str(query_limit)
 
         query = str_select + str_from + str_where + str_order + str_limit        
@@ -923,20 +937,21 @@ class List_Maker():
         self.cb_search_creator.prepend_text("")
 
     def get_order(self):
-      model = self.cb_cat_order.get_model()
-      active = self.cb_cat_order.get_active()
+      model = self.cb_search_order.get_model()
+      active = self.cb_search_order.get_active()
       if active < 0:
           return None
       return model[active][0]
 
     def cb_order_add(self):
-        list_order = ["Artist Alphabetical",
+        list_order = ["Newest Songs First",
+            "Oldest Songs First", 
+            "Artist Alphabetical",
             "Album Alphabetical",
-            "Most recent first",
-            "Oldest First"]
+]
         for item in list_order:
-            self.cb_cat_order.append_text(item)
-        self.cb_cat_order.set_active(0)
+            self.cb_search_order.append_text(item)
+        self.cb_search_order.set_active(0)
 
     def clear_cat_list(self):
         model = self.treeview_cat.get_model()
