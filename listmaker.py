@@ -62,6 +62,7 @@ select_items = (
     "cdtrack.tracktitle",
     "cdtrack.trackartist",
     "cdtrack.tracklength",
+
     "cdcomment.comment  AS cdcomment"
     )
 
@@ -1093,7 +1094,6 @@ class List_Maker():
         open a file chooser window to open or save a playlist file
     
         '''
-
         if act == "open_file":
             action = gtk.FILE_CHOOSER_ACTION_OPEN
             btn = gtk.STOCK_OPEN
@@ -1107,14 +1107,11 @@ class List_Maker():
             None,
             action,
             (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
-            btn, gtk.RESPONSE_OK)
+            btn, gtk.RESPONSE_ACCEPT)
             )
 
-        if act == "open_file":
-            dialog.set_default_response(gtk.RESPONSE_OK)
 
-        elif act == "save_file":
-            dialog.set_default_response(gtk.RESPONSE_ACCEPT)
+        dialog.set_default_response(gtk.RESPONSE_ACCEPT)
 
         dialog.set_current_folder(dir_pl3d)
         dialog.set_do_overwrite_confirmation(True)
@@ -1126,10 +1123,10 @@ class List_Maker():
         filter.add_pattern("*.pl3d")
         filter.add_pattern("*.p3d")
         dialog.add_filter(filter)
-
+        
         response = dialog.run()
         
-        if response == gtk.RESPONSE_OK:
+        if response == gtk.RESPONSE_ACCEPT:
             filename = dialog.get_filename()
             dialog.destroy()
             return filename
@@ -1141,13 +1138,9 @@ class List_Maker():
     def info_row(self, widget):    
         treeselection = self.treeview_pl.get_selection()
         model, iter = treeselection.get_selected()
-        try:
-            datatuple = model.get(iter, 0, 4, 3, 5)
-            self.info_message(datatuple)
-            
-        except TypeError:
-            this_error = "silent"
-        return   
+        details = self.get_details(model, iter)
+        self.show_details(widget, details)
+
 
     def info_message(self, datatuple):
         title = datatuple[0]
@@ -1217,6 +1210,7 @@ class List_Maker():
         filename = self.get_filename(action, None)
         filesp, filesfx = os.path.splitext(filename)
         
+
         if not (filesfx == sfx or filesfx == sfx_old):
             filename = filename + sfx
       
@@ -1300,6 +1294,7 @@ class List_Maker():
                 #location is the filepath. It contains the track number and CD ID 
                 location = item[2]
                 cdid, tracknum = location.split("-")
+
                 cdid = int(cdid)
                 tracknum = int(tracknum)
                 album = item[3]
@@ -1458,14 +1453,19 @@ class List_Maker():
             selection = treeview.get_selection()
             #print(selection)
             model, iter = selection.get_selected()
-            pickle_data = model.get(iter, 0)
-            artist = model.get(iter, 2)[0]
-            #print(pickle_data)
-            pickle_data = pickle_data[0]
-            dict_data = pickle.loads(pickle_data)
-            details = (dict_data, artist)
+            details = self.get_details(model, iter)
             menu = self.create_context_menu(details)
             menu.popup( None, None, None, event.button, event.get_time())
+
+            
+    def get_details(self, model, iter):
+        pickle_data = model.get(iter, 0)
+        artist = model.get(iter, 2)[0]
+        #print(pickle_data)
+        pickle_data = pickle_data[0]
+        dict_data = pickle.loads(pickle_data)
+        details = (dict_data, artist)
+        return details
 
     def create_context_menu(self, details):
         context_menu = gtk.Menu()
