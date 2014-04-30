@@ -518,7 +518,7 @@ class List_Maker():
         gtk.gdk.threads_init()
         
         self.Saved = False
-        name_of_open_file = None
+        self.name_of_open_file = None
 
         gtk.main()
 
@@ -596,9 +596,9 @@ class List_Maker():
         treeselection = treeview.get_selection()
         model, iter = treeselection.get_selected()
         
-        #if the tracklength column is ("", ) then the CD has been selected, 
-        tracklength = model.get(iter, 3)
-        if not tracklength[0]:
+        #if the tracktime column is ("", ) then the CD has been selected, 
+        tracktime = model.get(iter, 3)
+        if not tracktime[0]:
             pickle_data = ""
         else:
             pickle_data = model.get(iter, 0)
@@ -642,9 +642,8 @@ class List_Maker():
             trackartist = artist
             
         list_data = (pickle_data, tracktitle, trackartist, tracktime)
+
         ID = cd_code + "-" + track_no
-        print(ID)
-        print int_time
         if ID and  int_time:
             filepath = self.get_filepath(ID)
             #remove the check for testing where there are no files
@@ -676,9 +675,9 @@ class List_Maker():
                 self.update_time_total()
                 self.changed = True
                     
-        #else:
-        #    str_error = "Oops, I can't do that! Did you select a track or an album"
-        #    self.error_dialog(str_error)
+        else:
+            str_error = "Error - Not enough data in the list. Please contact a station tech for assistance"
+            self.error_dialog(str_error)
 
     
         return
@@ -791,6 +790,7 @@ class List_Maker():
                 trackartist = item['artist']
             
             int_time = item['tracklength']
+            int_time = int(int_time)
             dur_time = self.convert_time(int_time)
             
             if not album:
@@ -1097,18 +1097,17 @@ class List_Maker():
         if act == "open_file":
             action = gtk.FILE_CHOOSER_ACTION_OPEN
             btn = gtk.STOCK_OPEN
-            rsp = gtk.RESPONSE_OK
+
         elif act == "save_file":
             action = gtk.FILE_CHOOSER_ACTION_SAVE
             btn = gtk.STOCK_SAVE
-            rsp = gtk.RESPONSE_ACCEPT
-                        
+
         dialog = gtk.FileChooserDialog(
             "Select a Playlist",
             None,
             action,
             (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
-            btn, rsp)
+            btn, gtk.RESPONSE_OK)
             )
 
         if act == "open_file":
@@ -1124,17 +1123,13 @@ class List_Maker():
 
         filter = gtk.FileFilter()
         filter.set_name("Playlist files")
-        filter.add_pattern("*.pl3d", "*.p3d")
+        filter.add_pattern("*.pl3d")
+        filter.add_pattern("*.p3d")
         dialog.add_filter(filter)
 
         response = dialog.run()
         
         if response == gtk.RESPONSE_OK:
-            filename = dialog.get_filename()
-            dialog.destroy()
-            return filename
-                      
-        elif response == gtk.RESPONSE_ACCEPT:
             filename = dialog.get_filename()
             dialog.destroy()
             return filename
@@ -1202,9 +1197,11 @@ class List_Maker():
         iter = model.get_iter_first()
         ls_tracklist = []
         while iter:
-            row = model.get(iter, 0)
-            ls_tracklist.append(row)
+            pickle_row = model.get(iter, 0)[0]
+            dict_row = pickle.loads(pickle_row)
+            ls_tracklist.append(dict_row)
             iter = model.iter_next(iter)
+
 
         return ls_tracklist
             
@@ -1223,18 +1220,18 @@ class List_Maker():
         if not (filesfx == sfx or filesfx == sfx_old):
             filename = filename + sfx
       
-        print(filename)
+        print(filename, filesp, filesfx)
         
         if filename:
-            basename = os.path.basename(filename)
-            title = basename[:-5]
+            title = os.path.basename(filesp)
             self.window.set_title(title)
             self.changed = False
             
-        if filesfx == "p3d":
+        if filesfx == ".p3d":
             self.open_pl(filename)
             
-        elif filesfx == "pl3d":
+        elif filesfx == ".pl3d":
+
             self.open_pl_xml(filename)
 
     def save_change(self):
@@ -1262,12 +1259,12 @@ class List_Maker():
 
     def open_pl(self, filename):
 
-        f = open(filename)
-        ls_data = pickle.load(f)
-        f.close()
-        model = treeview.get_model()
-        for pickle_data in ls_data:
-            dict_data = pickle.loads(pickle_data)
+        ls_data = pickle.load(open(filename, "rb"))
+
+
+        model = self.treeview_pl.get_model()
+        for dict_data in ls_data:
+
             int_time = dict_data['tracklength']
             tracktime = self.convert_time(int_time)
             tracktitle = dict_data['tracktitle']
@@ -1276,19 +1273,19 @@ class List_Maker():
                 artist = dict_data['artist']
                 trackartist = artist
                 
+            pickle_data = pickle.dumps(dict_data)
+                
             model.append((pickle_data, tracktitle, trackartist, tracktime))
             
             self.update_time_total()
-            name_of_open_file = filename
+            self.name_of_open_file = filename
         
     def open_pl_xml(self, filename):
         '''
         open the deprecated playlist
         '''    
         if filename:
-            print("opening old version playlist " + filename)
             ls_tracklist = self.pl3d2pylist(filename)
-            print("creating the list")
             model = self.treeview_pl.get_model()
             model.clear()
             for item in ls_tracklist:
@@ -1302,10 +1299,9 @@ class List_Maker():
                 
                 #location is the filepath. It contains the track number and CD ID 
                 location = item[2]
-                if location:
-                    f_splitext = os.path.splitext(location)[0]
-                    ID = os.path.split(f_splitext)[1]
-                
+                cdid, tracknum = location.split("-")
+                cdid = int(cdid)
+                tracknum = int(tracknum)
                 album = item[3]
                 creator = item[4]
                 
@@ -1319,11 +1315,13 @@ class List_Maker():
                     int_dur = int(duration)/1000
                     str_dur = self.convert_time(int_dur)
                 
-                dict_row = {"title": title, 
+                dict_row = {"tracktitle": title, 
                             "track_id": track_id, 
-                            "cdid": ID, 
+                            "cdid": cdid, 
+                            "tracknum": tracknum, 
                             "album": album, 
-                            "artist": creator, 
+                            "artist": "", 
+                            "trackartist": creator, 
                             "company": company, 
                             "str_dur": str_dur, 
                             "tracklength": int_dur}
@@ -1334,16 +1332,16 @@ class List_Maker():
                 model.append(row)
             
             self.update_time_total()
-            name_of_open_file = filename
+            self.name_of_open_file = filename
                         
     def save(self, widget):
         '''
         save the file. First check that it is not a new file.
         '''
-        if name_of_open_file:
-            filename = name_of_open_file      
+        if self.name_of_open_file:
+            filename = self.name_of_open_file      
             ls_tracklist = self.get_tracklist()
-            pickle.dump(ls_tracklist, open("filename", "wb"))
+            pickle.dump(ls_tracklist, open(filename, "wb"))
 
         else:
             action = "save_file"
@@ -1357,9 +1355,9 @@ class List_Maker():
             if filename: 
                 ls_tracklist = self.get_tracklist()
                 try: 
-                    pickle.dump(ls_tracklist, open("filename", "wb"))
+                    pickle.dump(ls_tracklist, open(filename, "wb"))
                     self.changed = False
-                    name_of_open_file = filename
+                    self.name_of_open_file = filename
                     self.Saved = True
                     
                 except IOError:
@@ -1372,12 +1370,21 @@ class List_Maker():
                                    
     def saveas(self, widget):
         action = "save_file"
-        name = "Untitled.pl3d"
+        name = "Untitled.p3d"
         filename = self.get_filename(action, name)
-        print(filename)
-        if filename: 
+        filesp, filesfx = os.path.splitext(filename)
+        
+        if filename:
+            if not (filesfx == sfx):
+                filename = filesp + sfx
+            
+            title = os.path.basename(filesp)
+            self.window.set_title(title)
+            self.changed = False
+            
             ls_tracklist = self.get_tracklist()
-            pickle.dump(ls_tracklist, open("filename", "wb"))
+            pickle.dump(ls_tracklist, open(filename, "wb"))
+            self.name_of_open_file = filename
                 
     def pl3d2pylist(self, filename):
         '''
