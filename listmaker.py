@@ -158,6 +158,8 @@ class Preview_Player:
         pos_int = self.player.query_position(self.time_format, None)[0]
         seek_ns = pos_int + (10 * 1000000000)
         self.player.seek_simple(self.time_format, gst.SEEK_FLAG_FLUSH, seek_ns)
+
+
         
     def get_state(self):
         play_state = self.player.get_state(1)[1]
@@ -258,6 +260,8 @@ class List_Maker():
         
         # hbox for preview player buttons
         hbox_pre_btn = gtk.HBox(False, 0)  
+
+
         hbox_pre_btn.set_size_request(280, 30)
         # vbox for playlist
         vbox_pl = gtk.VBox(False, 5)
@@ -308,6 +312,11 @@ class List_Maker():
         self.chk_search_demo = gtk.CheckButton("Demo", True)
         self.chk_search_local = gtk.CheckButton("Local", True)       
         self.chk_search_fem = gtk.CheckButton("Female", True)
+        self.chk_search_nr = gtk.CheckButton("New Release", True)
+        
+        self.cb_search_year = gtk.combo_box_new_text()
+        self.cb_search_year_add()
+     
         label_search_order = gtk.Label("Order by")
         self.cb_search_order = gtk.combo_box_new_text()
         self.cb_order_add()
@@ -473,6 +482,9 @@ class List_Maker():
         vbox_cat_search.pack_start(self.chk_search_demo, False)
         vbox_cat_search.pack_start(self.chk_search_local, False)
         vbox_cat_search.pack_start(self.chk_search_fem, False)
+        vbox_cat_search.pack_start(self.chk_search_nr, False)
+        vbox_cat_search.pack_start(self.cb_search_year, False)
+        
         vbox_cat_search.pack_start(hbox_cat_order, False)   
         vbox_cat_search.pack_start(btn_search, False)
         #vbox_cat_search.pack_start(self.entry_search_adv, False)  
@@ -482,8 +494,6 @@ class List_Maker():
         vbox_cat_lst.pack_start(label_results, False)
         vbox_cat_lst.pack_start(sw_cat_lst, True)
         vbox_cat_lst.pack_start(hbox_pre_btn, False)
-
-
 
         hbox_pl_time.pack_end(self.label_time_1, False)
         hbox_pl_time.pack_end(label_time_0, False)
@@ -680,7 +690,6 @@ class List_Maker():
                 pg_cat_database, pg_user, pg_server, pg_password)
         conn = psycopg2.connect(conn_string)
         return conn
-
     
     def length_check(self, result):
         if len(result) == query_limit:
@@ -689,7 +698,6 @@ class List_Maker():
             str_warn_2 = ". Please modify your search and be more specific."
             str_warn = str_warn_0 + str(query_limit) + str_warn_1 + str(query_limit) + str_warn_2
             self.warn_dialog(str_warn)
-
     
     def add_to_cat_store(self, result):
 
@@ -749,7 +757,6 @@ class List_Maker():
             int_res = 0
         
         self.update_result_label(int_res)
-
     
     def query_catalogue(self):
         #obtain text from entries and combos and add to parameter dictionary
@@ -937,6 +944,18 @@ class List_Maker():
             self.cb_search_creator.append_text(str_creator)
         self.cb_search_creator.prepend_text("")
 
+    def cb_search_year_add(self):
+        '''
+        Get the current year, create a list from 1950 (first valid release date)
+        to the curent year, populate the drop don widget with the list
+        '''
+        year = datetime.date.today().year
+        first_year = 1950
+        while year >= first_year:
+            self.cb_search_year.append_text(str(year))
+            year = year-1
+        
+        
     def get_order(self):
       model = self.cb_search_order.get_model()
       active = self.cb_search_order.get_active()
@@ -1457,6 +1476,7 @@ class List_Maker():
 
         label_artist = gtk.Label()
         label_artist.set_alignment(0, 0.5)
+        label_artist.set_selectable(True)
         label_artist.set_text("Artist: " + artist)
         dialog.vbox.pack_start(label_artist, True, True, 0)
                 
@@ -1464,6 +1484,7 @@ class List_Maker():
         album = dict_data['title']
         label_album.set_text("Album: " + album)
         label_album.set_alignment(0, 0.5)
+        label_album.set_selectable(True)
         dialog.vbox.pack_start(label_album, True, True, 0)
 
         
@@ -1471,17 +1492,20 @@ class List_Maker():
             label_track = gtk.Label()
             track = dict_data['tracktitle']
             label_track.set_text("Track: " + track)
+            label_track.set_selectable(True)
             label_track.set_alignment(0, 0.5)
             dialog.vbox.pack_start(label_track, True, True, 0)
                 
         label_company = gtk.Label()
         label_company.set_alignment(0, 0.5)
+        label_company.set_selectable(True)
         company = dict_data['company']
         label_company.set_text("Company: " + company)
         dialog.vbox.pack_start(label_company, True, True, 0)
                 
         label_year = gtk.Label()
         label_year.set_alignment(0, 0.5)
+        label_year.set_selectable(True)
         year = dict_data['year']
         year = str(year)
 
@@ -1491,6 +1515,7 @@ class List_Maker():
                 
         label_arrivaldate = gtk.Label()
         label_arrivaldate.set_alignment(0, 0.5)
+        label_arrivaldate.set_selectable(True)
         arrivaldate = dict_data['arrivaldate']
         arrivaldate = str(arrivaldate)
         label_arrivaldate.set_text("date arrived: " + arrivaldate)
@@ -1498,6 +1523,7 @@ class List_Maker():
                 
         label_demo = gtk.Label()
         label_demo.set_alignment(0, 0.5)
+        label_demo.set_selectable(True)
         demo = dict_data['demo']
         if demo==1:
             demo = "no"
@@ -1510,6 +1536,7 @@ class List_Maker():
         
         label_local = gtk.Label()
         label_local.set_alignment(0, 0.5)
+        label_local.set_selectable(True)
         local = dict_data['local']
         if local==1:
             local = "no"
@@ -1525,6 +1552,7 @@ class List_Maker():
         
         label_female = gtk.Label()
         label_female.set_alignment(0, 0.5)
+        label_female.set_selectable(True)
         female = dict_data['female']
         if female==1:
             female = "no"
@@ -1539,6 +1567,7 @@ class List_Maker():
         
         label_cdid = gtk.Label()
         label_cdid.set_alignment(0, 0.5)
+        label_cdid.set_selectable(True)
         cdid = dict_data['cdid']
         cdid = str(cdid).zfill(7)
         label_cdid.set_text("CD ID Code: " + cdid)
@@ -1548,6 +1577,7 @@ class List_Maker():
         if cdcomment:
             label_cdcomment = gtk.Label()
             label_cdcomment.set_alignment(0, 0.5)
+            label_cdcomment.set_selectable(True)
             label_cdcomment.set_line_wrap(True)
             label_cdcomment.set_text("Comment: " + cdcomment)
             hs = gtk.HSeparator()
@@ -1557,12 +1587,13 @@ class List_Maker():
         comment = dict_data['comment']
         if comment:        
             label_comment = gtk.Label()
-            label_comment.set_alignment(0, 0.5)   
+            label_comment.set_alignment(0, 0.5)
+            label_comment.set_selectable(True)
             label_comment.set_line_wrap(True)         
             label_comment.set_text("Comment: " + comment)        
             hs = gtk.HSeparator()
             dialog.vbox.pack_start(hs, True, True, 0)
-            dialog.vbox.pack_start(label_cdcomment, True, True, 0)
+            dialog.vbox.pack_start(label_comment, True, True, 0)
 
         dialog.show_all()
         dialog.run()    
