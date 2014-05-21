@@ -429,7 +429,8 @@ class List_Maker():
         btn_save.connect("clicked", self.save)
         btn_saveas.connect("clicked", self.saveas)
         
-        self.treeview_cat.connect('button-press-event' , self.right_click_list_menu)
+        self.treeview_cat.connect('button-press-event' , self.right_click_cat)
+        self.treeview_pl.connect('button-press-event' , self.right_click_pl)        
         ### do the packing ###
 
         hbox_pre_btn.pack_start(self.btn_pre_play_pause, False)
@@ -947,8 +948,8 @@ class List_Maker():
         list_order = ["Newest Songs First",
             "Oldest Songs First", 
             "Artist Alphabetical",
-            "Album Alphabetical",
-]
+            "Album Alphabetical",]
+
         for item in list_order:
             self.cb_search_order.append_text(item)
         self.cb_search_order.set_active(0)
@@ -956,7 +957,6 @@ class List_Maker():
     def clear_cat_list(self):
         model = self.treeview_cat.get_model()
         model.clear()
-
 
     def update_result_label(self, int_res):
         if int_res < 200 :
@@ -966,6 +966,24 @@ class List_Maker():
         else:
             self.label_search_result.set_text("")
 
+    def right_click_cat(self, treeview, event):
+        if event.button == 3: # right click
+            menu = self.create_context_menu_cat(treeview)
+            menu.popup( None, None, None, event.button, event.get_time())
+
+    def create_context_menu_cat(self, treeview):
+        context_menu = gtk.Menu()
+        details_item = gtk.MenuItem( "Details")
+        details_item.connect( "activate", self.show_details, treeview)
+        details_item.show()
+        play_item = gtk.MenuItem("Play")
+        play_item.connect( "activate", self.play_from_menu, treeview)
+        play_item.show()
+        
+        context_menu.append(details_item)
+        context_menu.append(play_item)
+        #context_menu.append(play_item)
+        return context_menu
 
     # preview section  
     def get_sel_filepath(self):
@@ -1083,7 +1101,6 @@ class List_Maker():
         model, iter = treeselection.get_selected()
         details = self.get_details(model, iter)
         self.show_details(widget, details)
-
 
     def info_message(self, datatuple):
         title = datatuple[0]
@@ -1389,43 +1406,55 @@ class List_Maker():
             
         return ls_tracklist
 
-
-    #common functions
-    def right_click_list_menu(self, treeview, event):
+    def right_click_pl(self, treeview, event):
         if event.button == 3: # right click
-            selection = treeview.get_selection()
-            #print(selection)
-            model, iter = selection.get_selected()
-            details = self.get_details(model, iter)
-            menu = self.create_context_menu(details)
+            menu = self.create_context_menu_pl(treeview)
             menu.popup( None, None, None, event.button, event.get_time())
-            
-    def get_details(self, model, iter):
+
+    def create_context_menu_pl(self, treeview):
+        context_menu = gtk.Menu()
+        details_item = gtk.MenuItem( "Track Info")
+        details_item.connect( "activate", self.show_details, treeview)
+        details_item.show()
+
+        play_item = gtk.MenuItem("Play")
+        play_item.connect( "activate", self.play_from_menu, treeview)
+        play_item.show()
+        
+        remove_item =  gtk.MenuItem("Remove")
+        remove_item.connect( "activate", self.remove_row)
+        remove_item.show()
+        
+        context_menu.append(details_item)
+        context_menu.append(play_item)
+        context_menu.append(remove_item)
+
+        return context_menu
+    #common functions
+
+    def get_details(self, treeview):
+        selection = treeview.get_selection()
+        #print(selection)
+        model, iter = selection.get_selected()
+
         pickle_data = model.get(iter, 0)
         artist = model.get(iter, 2)[0]
-        #print(pickle_data)
         pickle_data = pickle_data[0]
         dict_data = pickle.loads(pickle_data)
-        details = (dict_data, artist)
-        return details
+        track_check = model.get(iter, 3)[0]
 
-    def create_context_menu(self, details):
-        context_menu = gtk.Menu()
-        details_item = gtk.MenuItem( "Details")
-        details_item.connect( "activate", self.show_details, details)
-        details_item.show()
-        play_item = gtk.MenuItem("Play")
-        play_item.show()
-        context_menu.append(details_item)
-        #context_menu.append(play_item)
-        return context_menu
+        details = (dict_data, artist, track_check)
+        return details
         
-    def show_details(self, w, details):
+    def show_details(self, widget, treeview):
+        '''
+        Open a dialogue window to display details of the selected row.
+        '''
         dialog = gtk.Dialog("Details", None, 0, (
             gtk.STOCK_OK, gtk.RESPONSE_OK))
-        
-        dict_data, artist = details
-        
+                
+        dict_data, artist, track_check = self.get_details(treeview)
+
         label_artist = gtk.Label()
         label_artist.set_alignment(0, 0.5)
         label_artist.set_text("Artist: " + artist)
@@ -1436,12 +1465,14 @@ class List_Maker():
         label_album.set_text("Album: " + album)
         label_album.set_alignment(0, 0.5)
         dialog.vbox.pack_start(label_album, True, True, 0)
-                
-        label_track = gtk.Label()
-        track = dict_data['tracktitle']
-        label_track.set_text("Track: " + track)
-        label_track.set_alignment(0, 0.5)
-        dialog.vbox.pack_start(label_track, True, True, 0)
+
+        
+        if track_check:
+            label_track = gtk.Label()
+            track = dict_data['tracktitle']
+            label_track.set_text("Track: " + track)
+            label_track.set_alignment(0, 0.5)
+            dialog.vbox.pack_start(label_track, True, True, 0)
                 
         label_company = gtk.Label()
         label_company.set_alignment(0, 0.5)
@@ -1453,7 +1484,7 @@ class List_Maker():
         label_year.set_alignment(0, 0.5)
         year = dict_data['year']
         year = str(year)
-        print(year)
+
         #year = (datetime.datetime.fromtimestamp(year).strftime('%Y'))
         label_year.set_text("Release Year: " + year) 
         dialog.vbox.pack_start(label_year, True, True, 0) 
@@ -1505,6 +1536,13 @@ class List_Maker():
             female = "unknown"
         dialog.vbox.pack_start(label_female, True, True, 0)        
         label_female.set_text("Female: " + female)
+        
+        label_cdid = gtk.Label()
+        label_cdid.set_alignment(0, 0.5)
+        cdid = dict_data['cdid']
+        cdid = str(cdid).zfill(7)
+        label_cdid.set_text("CD ID Code: " + cdid)
+        dialog.vbox.pack_start(label_cdid, True, True, 0)
 
         cdcomment = dict_data['cdcomment']
         if cdcomment:
@@ -1528,7 +1566,10 @@ class List_Maker():
 
         dialog.show_all()
         dialog.run()    
-        dialog.destroy()        
+        dialog.destroy()   
+        
+    def play_from_menu(self, widget, treeview):
+        print("Work In Progress")
         
     def convert_time(self, dur):
         s = int(dur)
