@@ -814,6 +814,14 @@ class List_Maker():
             q_genre = "cd.genre ILIKE %(genre)s AND "
         else:
             q_genre = None
+            
+        year = self.entry_search_year.get_text()
+        if year:
+            year = int(year)
+            parameters['year'] = year
+            q_year = "cd.year = %(year)s AND "
+        else:
+            q_year = None
                         
         created_by = self.cb_search_creator.get_active_text()
         if created_by:
@@ -852,6 +860,18 @@ class List_Maker():
         else:
             q_female = None
         
+        nr = self.chk_search_nr.get_active()
+        if nr:
+            today = datetime.date.today()
+            nr_delta = datetime.timedelta(days=60)
+            nr = today - nr_delta
+            parameters['nr'] = nr
+            q_nr = "cd.arrivaldate > %(nr)s AND "
+        else:
+            q_nr = None
+        
+
+
 
         #query according to the text
         
@@ -883,11 +903,13 @@ class List_Maker():
             q_company,
             q_comments,
             q_genre,
+            q_year,
             q_created_by,
             q_compil,
             q_demo,
             q_local,
             q_female,
+            q_nr
             )
             
         for item in q_var:
