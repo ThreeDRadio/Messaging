@@ -305,17 +305,22 @@ class List_Maker():
         self.entry_search_genre = gtk.Entry(50)        
         label_search_com = gtk.Label("Comments")
         self.entry_search_com = gtk.Entry(50)
-        label_search_creator = gtk.Label("Created by")
+        label_search_year = gtk.Label("Release year")
+        self.entry_search_year = gtk.Entry(4)
+        label_search_creator = gtk.Label("Added by")
         self.cb_search_creator = gtk.combo_box_new_text()
+        style = gtk.rc_parse_string('''
+            style "my-style" { GtkComboBox::appears-as-list = 1 }
+            widget "*.mycombo" style "my-style"
+        ''')
+        self.cb_search_creator.set_name('mycombo')
+        self.cb_search_creator.set_style(style)
         self.cb_creator_add()       
         self.chk_search_comp = gtk.CheckButton("Compilation", True)
         self.chk_search_demo = gtk.CheckButton("Demo", True)
         self.chk_search_local = gtk.CheckButton("Local", True)       
         self.chk_search_fem = gtk.CheckButton("Female", True)
         self.chk_search_nr = gtk.CheckButton("New Release", True)
-        
-        self.cb_search_year = gtk.combo_box_new_text()
-        self.cb_search_year_add()
      
         label_search_order = gtk.Label("Order by")
         self.cb_search_order = gtk.combo_box_new_text()
@@ -459,6 +464,8 @@ class List_Maker():
         table_cat.attach(self.entry_search_com, 1, 2, 4, 5, False, False, 5, 0)
         table_cat.attach(label_search_genre, 0, 1, 5, 6, False, False, 5, 0)
         table_cat.attach(self.entry_search_genre, 1, 2, 5, 6, False, False, 5, 0)
+        table_cat.attach(label_search_year, 0, 1, 6, 7,  False, False, 5, 0)
+        table_cat.attach(self.entry_search_year, 1, 2, 6, 7,  False, False, 5, 0)
         
         
         hbox_cat_creator.pack_start(label_search_creator, False)
@@ -483,7 +490,6 @@ class List_Maker():
         vbox_cat_search.pack_start(self.chk_search_local, False)
         vbox_cat_search.pack_start(self.chk_search_fem, False)
         vbox_cat_search.pack_start(self.chk_search_nr, False)
-        vbox_cat_search.pack_start(self.cb_search_year, False)
         
         vbox_cat_search.pack_start(hbox_cat_order, False)   
         vbox_cat_search.pack_start(btn_search, False)
@@ -933,28 +939,19 @@ class List_Maker():
         list_creator = dict_cur.fetchall()
         dict_cur.close()
         conn.close()
+
         return list_creator
 
     def cb_creator_add(self):
         liststore_creator = gtk.ListStore(str)        
         list_creator = self.get_creator()
+
         for item in list_creator:
             str_creator = str(item[0]) + ", " + item[1] + " " + item[2]
             self.cb_search_creator.append_text(str_creator)
         self.cb_search_creator.prepend_text("")
-
-    def cb_search_year_add(self):
-        '''
-        Get the current year, create a list from 1950 (first valid release date)
-        to the curent year, populate the drop don widget with the list
-        '''
-        year = datetime.date.today().year
-        first_year = 1950
-        while year >= first_year:
-            self.cb_search_year.append_text(str(year))
-            year = year-1
-        
-        
+        self.cb_search_creator.append_text("")
+     
     def get_order(self):
       model = self.cb_search_order.get_model()
       active = self.cb_search_order.get_active()
