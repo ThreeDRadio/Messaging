@@ -650,12 +650,11 @@ class List_Maker():
             filepath = self.get_filepath(ID)
             #remove the check for testing where there are no files
             #print(filepath)
-            #if not filepath:
-            #    str_error = "Unable to add to the list, file does not exist. That track has probably not yet been ripped into the music store"
-            #    self.error_dialog(str_error) 
-            
-            #else:
             if not filepath:
+                str_error = "Unable to add to the list, file does not exist. That track has probably not yet been ripped into the music store"
+                self.error_dialog(str_error) 
+            
+            else:
                 drop_info = treeview.get_dest_row_at_pos(x, y)
                 if drop_info:
                     path, position = drop_info
