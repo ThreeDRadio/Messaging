@@ -107,7 +107,8 @@ class Preview_Player:
         self.player.set_property("uri", "file://" + filepath)
         self.player.set_state(gst.STATE_PLAYING)
         self.play_thread_id = thread.start_new_thread(self.play_thread, ())
-             
+         
+    
     def stop(self):
         self.play_thread_id = None
         self.player.set_state(gst.STATE_NULL)
@@ -315,7 +316,8 @@ class List_Maker():
         ''')
         self.cb_search_creator.set_name('mycombo')
         self.cb_search_creator.set_style(style)
-        self.cb_creator_add()       
+        self.dict_creator = self.get_dict_creator()
+        self.cb_creator_add(self.dict_creator)       
         self.chk_search_comp = gtk.CheckButton("Compilation", True)
         self.chk_search_demo = gtk.CheckButton("Demo", True)
         self.chk_search_local = gtk.CheckButton("Local", True)       
@@ -823,10 +825,14 @@ class List_Maker():
         else:
             q_year = None
                         
-        created_by = self.cb_search_creator.get_active_text()
-        if created_by:
-            ls_creator = created_by.split(',')
-            created_by = ls_creator[0]
+        creator = self.cb_search_creator.get_active_text()
+        if creator:
+            # let's hope for the interim that we do not get
+            # two  members who have the same name ...
+            for id in self.dict_creator.keys():
+                if self.dict_creator[id] == creator:
+                    created_by = id 
+            print (created_by)
             parameters['created_by'] = created_by
             q_created_by = "cd.createwho = %(created_by)s AND "
         else:
@@ -953,24 +959,38 @@ class List_Maker():
         percented = ''.join(l)
         return percented
 
+    def get_dict_creator(self):
+        list_creator = self.get_creator()
+        dict_creator = {}
+        for creator in list_creator:
+            num = int(creator[0])
+            first = creator[1].lower()
+            second = creator[2].lower()
+            fullname = first + " " + second
+
+            dict_creator[num] = fullname
+
+        return(dict_creator)
+
     def get_creator(self):
-        query = "SELECT DISTINCT cd.createwho, users.first, users.last FROM cd JOIN users ON cd.createwho = users.id ORDER BY users.last"
+        query = "SELECT DISTINCT cd.createwho, users.first, users.last FROM cd JOIN users ON cd.createwho = users.id ORDER BY users.first"
         conn = self.pg_connect_cat()
-        dict_cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-        dict_cur.execute(query)
-        list_creator = dict_cur.fetchall()
-        dict_cur.close()
+        cur = conn.cursor()
+        #dict_cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        cur.execute(query)
+        list_creator = cur.fetchall()
+        cur.close()
         conn.close()
 
         return list_creator
 
-    def cb_creator_add(self):
+    def cb_creator_add(self, dict_creator):
         liststore_creator = gtk.ListStore(str)        
-        list_creator = self.get_creator()
+        list_creator = sorted(dict_creator.values())
+        
 
-        for item in list_creator:
-            str_creator = str(item[0]) + ", " + item[1] + " " + item[2]
-            self.cb_search_creator.append_text(str_creator)
+        for creator in list_creator:
+            self.cb_search_creator.append_text(creator)
         self.cb_search_creator.prepend_text("")
         self.cb_search_creator.append_text("")
      
