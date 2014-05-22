@@ -877,14 +877,12 @@ class List_Maker():
             q_nr = None
         
 
-
-
         #query according to the text
         
         str_error_none = "No search terms were entered"
         str_error_len = "Please enter more than one character in your search"
         
-        if not artist and not album and not track and not company and not comments and not genre:
+        if not artist and not album and not track and not company and not comments and not genre and not year and not nr:
             self.error_dialog(str_error_none)
             return False
             
@@ -1638,8 +1636,25 @@ class List_Maker():
         dialog.destroy()   
         
     def play_from_menu(self, widget, treeview):
-        print("Work In Progress")
+        selection = treeview.get_selection()
+        model, iter = selection.get_selected()
+        pickle_data = model.get(iter, 0)
+        pickle_data = pickle_data[0]
+        dict_data = pickle.loads(pickle_data)
+        cdid = str(dict_data["cdid"])
+        tracknum = str(dict_data["tracknum"])
         
+        ID = cdid + "-" + tracknum
+        filepath = self.get_filepath(ID)
+        
+        if filepath:
+            img = self.btn_pre_play_pause.get_image()
+            if img.get_name() != "play":
+                self.player_pre.stop()
+                          
+            self.btn_pre_play_pause.set_image(self.image_pause)
+            self.player_pre.start(filepath)
+                
     def convert_time(self, dur):
         s = int(dur)
         m,s = divmod(s, 60)
