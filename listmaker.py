@@ -1636,17 +1636,21 @@ class List_Maker():
         dialog.destroy()   
         
     def play_from_menu(self, widget, treeview):
+
         selection = treeview.get_selection()
         model, iter = selection.get_selected()
         pickle_data = model.get(iter, 0)
         pickle_data = pickle_data[0]
         dict_data = pickle.loads(pickle_data)
-        cdid = str(dict_data["cdid"])
-        tracknum = str(dict_data["tracknum"])
+        cdid = (dict_data["cdid"])
+        cdid = str(cdid).zfill(7)
+        tracknum = (dict_data["tracknum"])
+        tracknum = str(tracknum).zfill(2)
         
         ID = cdid + "-" + tracknum
+        print(ID)
         filepath = self.get_filepath(ID)
-        
+        print(filepath)
         if filepath:
             img = self.btn_pre_play_pause.get_image()
             if img.get_name() != "play":
