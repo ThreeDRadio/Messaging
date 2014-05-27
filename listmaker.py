@@ -229,6 +229,9 @@ class List_Maker():
         gtk.main_quit()
 
     def main(self):
+        '''defines the layout of the graphical interface
+           and the events connected to the widgets
+        '''
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL) 
         self.window.set_position(gtk.WIN_POS_CENTER)
         filepath_logo = dir_img + logo
@@ -534,7 +537,10 @@ class List_Maker():
 
     # columns for the lists
     def add_cat_columns(self, treeview):
-        
+        '''
+        Columns for the list of search results. The first column is hidden 
+        and contains all the information about the track/CD in that row
+        '''
         #Column ONE
         column = gtk.TreeViewColumn('Dict', gtk.CellRendererText(),
                                     text=0)
@@ -570,6 +576,10 @@ class List_Maker():
         treeview.append_column(column)
         
     def add_pl_columns(self, treeview):
+        '''
+        Columns for the playlist of tracks. The first column is hidden 
+        and contains all the information about the track in that row
+        '''
         # Column ONE
         column = gtk.TreeViewColumn('Dict', gtk.CellRendererText(),
                                     text=0)
@@ -603,10 +613,14 @@ class List_Maker():
     # dnd    
     def cat_drag_data_get_data(self, treeview, context, selection, target_id,
                            etime):
+        '''
+        copy the details from the hidden column of the selected row
+        for drag n drop from the search results list.
+        '''
         treeselection = treeview.get_selection()
         model, iter = treeselection.get_selected()
         
-        #if the tracktime column is ("", ) then the CD has been selected, 
+        #if the tracktime column is ("", ) then the CD has been selected, not a track 
         tracktime = model.get(iter, 3)
         if not tracktime[0]:
             pickle_data = ""
@@ -618,6 +632,10 @@ class List_Maker():
 
     def pl_drag_data_get_data(self, treeview, context, selection, target_id,
                            etime):
+        '''
+        copy the details from the hidden column of the selected row
+        for drag n drop within the playlist.
+        '''
         treeselection = treeview.get_selection()
         model, iter = treeselection.get_selected()
         
@@ -630,6 +648,9 @@ class List_Maker():
         
     def drag_data_received_data(self, treeview, context, x, y, selection,
                                 info, etime):
+        '''
+        add or move a row in the playlist using details copied with drag n drop.
+        '''
         model = treeview.get_model()
         pickle_data = selection.get_text()
         if not pickle_data:
@@ -693,12 +714,20 @@ class List_Maker():
 
     # music catalogue section       
     def pg_connect_cat(self):
+        '''
+        initiate a connection to the catalogue database
+        '''
         conn_string = 'dbname={0} user={1} host={2} password={3}'.format (
                 pg_cat_database, pg_user, pg_server, pg_password)
         conn = psycopg2.connect(conn_string)
         return conn
     
     def length_check(self, result):
+        '''
+        check if the number of results returned is equal to 
+        the value set as the limit for returned results.
+        Display a message if the number is equal
+        '''
         if len(result) == query_limit:
             str_warn_0 = "Warning - your query returned "
             str_warn_1 = " or more results. Only displaying the first "
@@ -707,7 +736,10 @@ class List_Maker():
             self.warn_dialog(str_warn)
     
     def add_to_cat_store(self, result):
-
+        '''
+        take the results of the search and display as rows in a treeview list
+        full search details for each item go into the hidden column 
+        '''
         self.clear_cat_list()
         var_album = ""
         for item in result:
@@ -753,6 +785,9 @@ class List_Maker():
             var_album = album
 
     def search_catalogue(self, widget):
+        '''
+        run functions which query the database and display the results as a list
+        '''
         result = self.query_catalogue()
         if result:
             self.length_check(result)
@@ -766,6 +801,10 @@ class List_Maker():
         self.update_result_label(int_res)
     
     def query_catalogue(self):
+        '''
+        Make a query to the catalogue database based on the user input. 
+        Return the results.
+        '''
         #obtain text from entries and combos and add to parameter dictionary
         parameters = {}
         
@@ -953,11 +992,18 @@ class List_Maker():
         return result
 
     def add_percent(self, parameter):
+        '''
+        wrap the string with percentage signs for 'LIKE' query, avoiding 
+        conflict with the symbol for substitution when defining parameters
+        '''
         l = ('%', parameter, '%')
         percented = ''.join(l)
         return percented
 
     def get_dict_creator(self):
+        '''
+        create a dictionary of music catalogue user IDs and names
+        '''
         list_creator = self.get_creator()
         dict_creator = {}
         for creator in list_creator:
@@ -971,6 +1017,9 @@ class List_Maker():
         return(dict_creator)
 
     def get_creator(self):
+        '''
+        query the catalogue for all users        
+        '''
         query = "SELECT DISTINCT cd.createwho, users.first, users.last FROM cd JOIN users ON cd.createwho = users.id ORDER BY users.first"
         conn = self.pg_connect_cat()
         cur = conn.cursor()
@@ -983,6 +1032,9 @@ class List_Maker():
         return list_creator
 
     def cb_creator_add(self, dict_creator):
+        '''
+        populate the drop down list of contributors
+        '''
         liststore_creator = gtk.ListStore(str)        
         list_creator = sorted(dict_creator.values())
         
@@ -992,14 +1044,25 @@ class List_Maker():
         self.cb_search_creator.prepend_text("")
         self.cb_search_creator.append_text("")
      
+        '''
+        an orphaned function?
+        ...will delete after checking
+        
+        
     def get_order(self):
-      model = self.cb_search_order.get_model()
-      active = self.cb_search_order.get_active()
-      if active < 0:
-          return None
-      return model[active][0]
+        
+        model = self.cb_search_order.get_model()
+        active = self.cb_search_order.get_active()
+        if active < 0:
+            return None
+        return model[active][0]
+        '''
 
     def cb_order_add(self):
+        '''
+        populate the drop down list for selecting the order to list 
+        search results 
+        '''
         list_order = ["Newest Songs First",
             "Oldest Songs First", 
             "Artist Alphabetical",
@@ -1010,23 +1073,34 @@ class List_Maker():
         self.cb_search_order.set_active(0)
 
     def clear_cat_list(self):
+        '''
+        clear the search results
+        '''
         model = self.treeview_cat.get_model()
         model.clear()
 
     def update_result_label(self, int_res):
-        if int_res < 200 :
-            str_results = "Your search returned {0} results".format(int_res)
-            self.label_search_result.set_text(str_results)
+        '''
+        Show how many tracks were found in the search
+        '''
+        if int_res >= query_limit :
+            int_res = str(query_limit) + "+"
+        str_results = "Your search returned {0} results".format(int_res)
+        self.label_search_result.set_text(str_results)
 
-        else:
-            self.label_search_result.set_text("")
 
     def right_click_cat(self, treeview, event):
+        '''
+        on right-click of the search result list, create the menu
+        '''
         if event.button == 3: # right click
             menu = self.create_context_menu_cat(treeview)
             menu.popup( None, None, None, event.button, event.get_time())
 
     def create_context_menu_cat(self, treeview):
+        '''
+        menu to display on right-click of the search result list
+        '''
         context_menu = gtk.Menu()
         details_item = gtk.MenuItem( "Details")
         details_item.connect( "activate", self.show_details, treeview)
