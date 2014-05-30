@@ -1116,6 +1116,11 @@ class List_Maker():
 
     # preview section  
     def get_sel_filepath(self):
+        '''
+        get the filepath of the track selected in the search results. 
+        Combine the cdid with the track number to get the name of the file
+        then call the function to get the full path 
+        '''
         treeselection = self.treeview_cat.get_selection()
         model, iter = treeselection.get_selected()
         pickle_list = model.get(iter, 0)
@@ -1135,6 +1140,11 @@ class List_Maker():
             return filepath
 
     def play_pause_clicked(self, widget):
+        '''
+        play or pause the selected track in the preview player. Change the icon 
+        between play and pause.
+        
+        '''
         filepath = self.get_sel_filepath()
         if filepath:
             img = self.btn_pre_play_pause.get_image()
@@ -1147,19 +1157,33 @@ class List_Maker():
                 self.btn_pre_play_pause.set_image(self.image_play)
                 
     def on_stop_clicked(self, widget):
+        '''
+        Stop playing the track in the preview player
+        '''
         self.player_pre.stop()
         self.btn_pre_play_pause.set_image(self.image_play)
         self.label_pre_time.set_text("00:00 / " + self.str_dur)
     
     def reset_playbutton(self):
+        '''
+        set the play/pause button to the play image
+        '''
         self.btn_pre_play_pause.set_image(self.image_play)
         
     def cat_selection_changed(self, selection):
+        '''
+        Stop playing the track in the preview player when a different 
+        track is selected
+        '''
         playstatus = self.player_pre.get_state() 
         if (playstatus == gst.STATE_PLAYING) or (playstatus == gst.STATE_PAUSED):
             self.on_stop_clicked(True)
             
     def on_seek_changed(self, widget, param):
+        '''
+        move to a different point in the track after the horizontal 
+        slider is moved.
+        '''
         self.player_pre.set_updateable_progress(True)
         self.player_pre.set_place_in_file(self.hscale_pre.get_value())
     
