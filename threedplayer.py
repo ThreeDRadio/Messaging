@@ -19,6 +19,7 @@ import sys
 import psycopg2
 import subprocess
 import datetime
+import pickle
 import os
 import time
 import gst
@@ -604,7 +605,7 @@ class ThreeD_Player():
         self.make_buttons()
   
         #make the list
-        store_msg = gtk.ListStore(str, str, str, str, str, str, str, str, str)
+        store_msg = gtk.ListStore(str, str, str, str, str)
         self.treeview_msg = gtk.TreeView(store_msg)
         self.treeview_msg.set_rules_hint(True)
         treeselection_msg = self.treeview_msg.get_selection()
@@ -660,7 +661,7 @@ class ThreeD_Player():
         label_results.set_size_request(80, 30)
 
         #make the list
-        self.store_cat = gtk.TreeStore(str ,str ,str ,str ,str ,str ,str, str, str)
+        self.store_cat = gtk.TreeStore(str ,str ,str ,str)
         self.treeview_cat = gtk.TreeView(self.store_cat)
         self.treeview_cat.set_rules_hint(True)
         treeselection_cat = self.treeview_cat.get_selection()
@@ -690,7 +691,7 @@ class ThreeD_Player():
         btn_pl3d_select = gtk.Button("Browse for a pl3d playlist")
         
         #treeview to display playlist
-        store_pl3d_lst = gtk.ListStore(str ,str ,str ,str ,str ,str ,str, str, str)
+        store_pl3d_lst = gtk.ListStore(str ,str ,str ,str ,str)
         self.treeview_pl3d_lst = gtk.TreeView(store_pl3d_lst)        
         self.treeview_pl3d_lst.set_rules_hint(True)        
         self.treeview_pl3d_lst.set_rubber_banding(True)
@@ -720,7 +721,7 @@ class ThreeD_Player():
         label_bc.set_size_request(30, 30)        
       
         #make the list
-        bc_store = gtk.ListStore(str ,str ,str ,str ,str ,str ,str, str, str,
+        bc_store = gtk.ListStore(str, str, str, str,
             gobject.TYPE_BOOLEAN, gtk.gdk.Pixbuf)
         self.treeview_bc = gtk.TreeView(bc_store)
         self.treeview_bc.set_rules_hint(True)
@@ -778,7 +779,7 @@ class ThreeD_Player():
         btn_sch_add = gtk.Button("Add to Broadcast List")
 
         # make the scheduler list display
-        self.store_sch = gtk.ListStore(str ,str, str, str, str, str, str, str, str)         
+        self.store_sch = gtk.ListStore(str ,str, str, str)         
         self.treeview_sch = gtk.TreeView(self.store_sch)
         self.treeview_sch.set_rules_hint(True)
         treeselection_sch = self.treeview_sch.get_selection()
@@ -1021,153 +1022,82 @@ class ThreeD_Player():
         '''
         columns for the list of messages
         '''
-        # column ONE
-        column = gtk.TreeViewColumn('msg', gtk.CellRendererText(),
-                                     text=0)
+        #Column ONE
+        column = gtk.TreeViewColumn('Dict', gtk.CellRendererText(),
+                                    text=0)
         column.set_sort_column_id(0)
         column.set_visible(False)
-        self.treeview_msg.append_column(column)
+        treeview.append_column(column)
 
         # column TWO
         column = gtk.TreeViewColumn('CODE', gtk.CellRendererText(),
                                     text=1)
         column.set_sort_column_id(1)
-        #column.set_visible(False)
         column.set_clickable(False)
         self.treeview_msg.append_column(column)
 
         # column THREE
-        column = gtk.TreeViewColumn('Filename', gtk.CellRendererText(),
+        column = gtk.TreeViewColumn('Message', gtk.CellRendererText(),
                                     text=2)
         column.set_sort_column_id(2)
-        column.set_visible(False)
+        column.set_clickable(False)
         treeview_msg.append_column(column)
         
         #Column FOUR
-        column = gtk.TreeViewColumn('Message', gtk.CellRendererText(),
+        column = gtk.TreeViewColumn('Ending', gtk.CellRendererText(),
                                     text=3)
         column.set_sort_column_id(3)
         column.set_clickable(False)
         treeview_msg.append_column(column)
         
         #Column FIVE
-        column = gtk.TreeViewColumn('Ending', gtk.CellRendererText(),
+        column = gtk.TreeViewColumn('Time', gtk.CellRendererText(),
                                     text=4)
         column.set_sort_column_id(4)
         column.set_clickable(False)
         treeview_msg.append_column(column)
-        
-        #Column SIX
-        column = gtk.TreeViewColumn('Type', gtk.CellRendererText(),
-                                    text=5)
-        column.set_sort_column_id(5)
-        column.set_visible(False)
-        treeview_msg.append_column(column)
-        
-        #Column SEVEN
-        column = gtk.TreeViewColumn('Producer', gtk.CellRendererText(),
-                                    text=6)
-        column.set_sort_column_id(6)
-        column.set_visible(False)
-        treeview_msg.append_column(column)
-        
-        #Column EIGHT
-        column = gtk.TreeViewColumn('Time', gtk.CellRendererText(),
-                                    text=7)
-        column.set_sort_column_id(7)
-        column.set_clickable(False)
-        treeview_msg.append_column(column)
-        
-        #Column NINE
-        column = gtk.TreeViewColumn('Duration-seconds', gtk.CellRendererText(),
-                                    text=8)
-        column.set_sort_column_id(8)
-        column.set_visible(False)
-        treeview_msg.append_column(column)
-        
+ 
     def add_bc_columns(self, treeview_bc):
         '''
         Columns for the broadcast list
         '''
-        # column ONE
-        column = gtk.TreeViewColumn(
-            'msg/mus', gtk.CellRendererText(), text=0)
+        #Column ONE
+        column = gtk.TreeViewColumn('Dict', gtk.CellRendererText(),
+                                    text=0)
         column.set_sort_column_id(0)
         column.set_visible(False)
-        self.treeview_bc.append_column(column)
+        treeview.append_column(column)
 
-        # column TWO
+        #Column TWO
         column = gtk.TreeViewColumn(
-            'CODE (log)', gtk.CellRendererText(), text=1)
+            'Track Title', gtk.CellRendererText(), text=1)
         column.set_sort_column_id(1)
-        column.set_visible(False)
-        self.treeview_bc.append_column(column)
-
-        # column THREE
-        column = gtk.TreeViewColumn(
-            'filename / CDcode-TrackNo', gtk.CellRendererText(), text=2)
-        column.set_sort_column_id(2)
-        column.set_visible(False)
-        self.treeview_bc.append_column(column)
-        
-        #Column FOUR
-        column = gtk.TreeViewColumn(
-            'Track Title', gtk.CellRendererText(), text=3)
-        column.set_sort_column_id(3)
         column.set_clickable(False)
         column.set_sizing(gtk.TREE_VIEW_COLUMN_FIXED)
         column.set_fixed_width(200)
         self.treeview_bc.append_column(column)
         
-        #Column FIVE
+        #Column THREE
         column = gtk.TreeViewColumn(
-            'Artist/NQ', gtk.CellRendererText(), text=4)
-        column.set_sort_column_id(4)
-        column.set_visible(False)    
-        self.treeview_bc.append_column(column)
-        
-        #Column SIX
-        column = gtk.TreeViewColumn(
-            'Album', gtk.CellRendererText(), text=5)
-        column.set_sort_column_id(5)
-        column.set_visible(False)
-        self.treeview_bc.append_column(column)
-        
-        #Column SEVEN
-        column = gtk.TreeViewColumn(
-            'Company', gtk.CellRendererText(), text=6)
-        column.set_sort_column_id(6)
-        column.set_visible(False)
-        self.treeview_bc.append_column(column)
-
-        #Column EIGHT
-        column = gtk.TreeViewColumn(
-            'Time', gtk.CellRendererText(), text=7)
-        column.set_sort_column_id(7)
+            'Time', gtk.CellRendererText(), text=2)
+        column.set_sort_column_id(2)
         column.set_clickable(False)
         self.treeview_bc.append_column(column)
 
-        #Column NINE
+        #Column FOUR
         column = gtk.TreeViewColumn(
-            'Dur_int', gtk.CellRendererText(), text=8)
-        column.set_sort_column_id(8)
-        column.set_visible(False)
-        self.treeview_bc.append_column(column)
-
-        #Column TEN
-        column = gtk.TreeViewColumn(
-            'Joined', gtk.CellRendererToggle(), active=9)
-        column.set_sort_column_id(9)
+            'Joined', gtk.CellRendererToggle(), active=3)
+        column.set_sort_column_id(3)
         column.set_visible(False)
         self.treeview_bc.append_column(column)        
 
 
-        #Column ELEVEN
+        #Column FIVE
         cell_pix = CellRendererPixbufXt()
         cell_pix.connect("clicked", self.join_clicked)
         column = gtk.TreeViewColumn(
-            '', cell_pix, pixbuf=10)
-        column.set_sort_column_id(10)
+            '', cell_pix, pixbuf=4)
+        column.set_sort_column_id(4)
         column.set_clickable(False)
         #column.set_sizing(gtk.TREE_VIEW_COLUMN_FIXED)
         #column.set_fixed_width(26)
@@ -1177,19 +1107,21 @@ class ThreeD_Player():
         '''
         Columns for the schedule list
         '''
-        column = gtk.TreeViewColumn('Time', gtk.CellRendererText(),
-                                     text=0)
+        #Column ONE
+        column = gtk.TreeViewColumn('Dict', gtk.CellRendererText(),
+                                    text=0)
         column.set_sort_column_id(0)
-        column.set_clickable(False)
-        self.treeview_sch.append_column(column)
+        column.set_visible(False)
+        treeview.append_column(column)        
         
-        column = gtk.TreeViewColumn('Programme Code', gtk.CellRendererText(),
-                                    text=1)
+        #Column TWO
+        column = gtk.TreeViewColumn('Time', gtk.CellRendererText(),
+                                     text=1)
         column.set_sort_column_id(1)
         column.set_clickable(False)
-        column.set_visible(False)
-        self.treeview_sch.append_column(column) 
+        self.treeview_sch.append_column(column)
 
+        #Column THREE
         column = gtk.TreeViewColumn('Programme', gtk.CellRendererText(),
                                     text=2)
         column.set_sort_column_id(2)
@@ -1197,195 +1129,93 @@ class ThreeD_Player():
         column.set_resizable(True)
         self.treeview_sch.append_column(column)
         
-        column = gtk.TreeViewColumn('ID Code', gtk.CellRendererText(),
+        #Column FOUR
+        column = gtk.TreeViewColumn('Message', gtk.CellRendererText(),
                                     text=3)
         column.set_sort_column_id(3)
         column.set_clickable(False)
-        column.set_visible(False)
-        self.treeview_sch.append_column(column)
-        
-        column = gtk.TreeViewColumn('Message', gtk.CellRendererText(),
-                                    text=4)
-        column.set_sort_column_id(4)
-        column.set_clickable(False)
         column.set_resizable(True)
         self.treeview_sch.append_column(column)     
-
-        column = gtk.TreeViewColumn('Type', gtk.CellRendererText(),
-                                    text=5)
-        column.set_sort_column_id(5)
-        column.set_visible(False)
-        column.set_clickable(False)
-        self.treeview_sch.append_column(column)
-
-        column = gtk.TreeViewColumn('Ending', gtk.CellRendererText(),
-                                    text=6)
-        column.set_sort_column_id(6)
-        column.set_clickable(False)
-        column.set_visible(False)
-        self.treeview_sch.append_column(column)
-        
-        column = gtk.TreeViewColumn('Filename', gtk.CellRendererText(),
-                                    text=7)
-        column.set_sort_column_id(7)
-        column.set_clickable(False)
-        column.set_visible(False)
-        self.treeview_sch.append_column(column)          
-
-        column = gtk.TreeViewColumn('Duration', gtk.CellRendererText(),
-                                    text=8)
-        column.set_sort_column_id(8)
-        column.set_clickable(False)
-        column.set_visible(False)
-        self.treeview_sch.append_column(column)
 
     def add_cat_columns(self, treeview):
         '''
         Columns for the catalogue search results list
         '''
+        
         #Column ONE
-        column = gtk.TreeViewColumn('mus', gtk.CellRendererText(),
+        column = gtk.TreeViewColumn('Dict', gtk.CellRendererText(),
                                     text=0)
         column.set_sort_column_id(0)
         column.set_visible(False)
-        treeview.append_column(column) 
-        
-                
-        # column TWO
-        column = gtk.TreeViewColumn('Code', gtk.CellRendererText(),
-                                     text=1)
-        column.set_sort_column_id(1)
-        column.set_visible(False)
-        treeview.append_column(column)   
-
-        # column THREE
-        column = gtk.TreeViewColumn('CD Code/Track No', gtk.CellRendererText(),
-                                    text=2)
-        column.set_sort_column_id(2)
-        column.set_visible(False)
         treeview.append_column(column)
         
-        #Column FOUR
+        #Column TWO
         column = gtk.TreeViewColumn('Album / Title', gtk.CellRendererText(),
-                                    text=3)
-        column.set_sort_column_id(3)
+                                    text=1)
+        column.set_sort_column_id(1)
         #column.set_visible(False)
         column.set_max_width(360)
         column.set_resizable(True)
         column.set_clickable(False)
         treeview.append_column(column)
 
-        #Column FIVE
+        #Column THREE
         column = gtk.TreeViewColumn('Artist', gtk.CellRendererText(),
-                                    text=4)
-        column.set_sort_column_id(4)
+                                    text=2)
+        column.set_sort_column_id(2)
         column.set_clickable(False)
         column.set_resizable(True)
         treeview.append_column(column)
-
-        # column SIX
-        column = gtk.TreeViewColumn('Album', gtk.CellRendererText(),
-                                    text=5)
-        column.set_sort_column_id(5)
-        column.set_clickable(False)
-        column.set_resizable(True)
-        column.set_visible(False)
-        treeview.append_column(column)
-                
-        #Column SEVEN
-        column = gtk.TreeViewColumn('Company', gtk.CellRendererText(),
-                                    text=6)
-        column.set_sort_column_id(6)
-        column.set_visible(False)
-        treeview.append_column(column)
-        
-        #Column EIGHT
+                     
+        #Column FOUR
         column = gtk.TreeViewColumn('Time', gtk.CellRendererText(),
-                                    text=7)
-        column.set_sort_column_id(7)
-        #column.set_visible(False)
+                                    text=3)
+        column.set_sort_column_id(3)
         treeview.append_column(column)
-        
-        #Column NINE
-        column = gtk.TreeViewColumn('TrackTime - int', gtk.CellRendererText(),
-                                    text=8)
-        column.set_sort_column_id(8)
-        column.set_visible(False)
-        treeview.append_column(column) 
 
     def add_pl3d_columns(self, treeview):
         '''
         columns for the playlist list
         '''
         #Column ONE
-        column = gtk.TreeViewColumn('mus', gtk.CellRendererText(),
+        column = gtk.TreeViewColumn('Dict', gtk.CellRendererText(),
                                     text=0)
         column.set_sort_column_id(0)
         column.set_visible(False)
-        treeview.append_column(column) 
-        
-                
-        # column TWO
-        column = gtk.TreeViewColumn('Code', gtk.CellRendererText(),
-                                     text=1)
-        column.set_sort_column_id(1)
-        column.set_visible(False)
-        treeview.append_column(column)   
-
-        # column THREE
-        column = gtk.TreeViewColumn('CD Code/Track No', gtk.CellRendererText(),
-                                    text=2)
-        column.set_sort_column_id(2)
-        column.set_visible(False)
         treeview.append_column(column)
         
-        #Column FOUR
+        
+        #Column TWO
         column = gtk.TreeViewColumn('Title', gtk.CellRendererText(),
-                                    text=3)
-        column.set_sort_column_id(3)
-        #column.set_visible(False)
+                                    text=1)
+        column.set_sort_column_id(1)
         column.set_max_width(360)
         column.set_resizable(True)
         column.set_clickable(False)
         treeview.append_column(column)
 
-        #Column FIVE
+        #Column THREE
         column = gtk.TreeViewColumn('Artist', gtk.CellRendererText(),
-                                    text=4)
-        column.set_sort_column_id(4)
+                                    text=2)
+        column.set_sort_column_id(2)
         column.set_clickable(False)
         column.set_resizable(True)
         treeview.append_column(column)
 
-        # column SIX
+        # column FOUR
         column = gtk.TreeViewColumn('Album', gtk.CellRendererText(),
                                     text=5)
         column.set_sort_column_id(5)
         column.set_clickable(False)
         column.set_resizable(True)
         treeview.append_column(column)
-                
-        #Column SEVEN
-        column = gtk.TreeViewColumn('Company', gtk.CellRendererText(),
-                                    text=6)
-        column.set_sort_column_id(6)
-        column.set_visible(False)
-        treeview.append_column(column)
-        
-        #Column EIGHT
+
+        #Column FIVE
         column = gtk.TreeViewColumn('Time', gtk.CellRendererText(),
                                     text=7)
         column.set_sort_column_id(7)
-        #column.set_visible(False)
         treeview.append_column(column)
         column.set_clickable(False)
-        
-        #Column NINE
-        column = gtk.TreeViewColumn('TrackTime - int', gtk.CellRendererText(),
-                                    text=8)
-        column.set_sort_column_id(8)
-        column.set_visible(False)
-        treeview.append_column(column) 
         
     # dnd    
     def msg_drag_data_get_data(self, treeview, context, selection, target_id,
