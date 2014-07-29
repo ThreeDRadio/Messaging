@@ -45,15 +45,24 @@ tup_day = ("Monday",
 
 #lists 
 select_items = (
+    "cd.title",
+    "cd.artist",
+    "cd.company",
+    "cd.year",
+    "cd.arrivaldate",
+    "cd.demo",
+    "cd.local",
+    "cd.female",
+    "cd.createwho",
+    "cd.createwhen",
+    "cd.comment" ,
     "cdtrack.trackid",
     "cdtrack.cdid",
     "cdtrack.tracknum",
     "cdtrack.tracktitle",
     "cdtrack.trackartist",
-    "cd.artist",
-    "cd.title",
-    "cd.company",
-    "cdtrack.tracklength"
+    "cdtrack.tracklength",
+    "cdcomment.comment  AS cdcomment"
     )
 
 where_items = (
@@ -62,6 +71,7 @@ where_items = (
     "cd.title",
     "cd.artist"
     )
+
 
         ### Styles ###
 
@@ -1018,7 +1028,7 @@ class ThreeD_Player():
         gtk.main()
 
     # columns for the lists
-    def add_msg_columns(self, treeview_msg):
+    def add_msg_columns(self, treeview):
         '''
         columns for the list of messages
         '''
@@ -1034,30 +1044,30 @@ class ThreeD_Player():
                                     text=1)
         column.set_sort_column_id(1)
         column.set_clickable(False)
-        self.treeview_msg.append_column(column)
+        treeview.append_column(column)
 
         # column THREE
         column = gtk.TreeViewColumn('Message', gtk.CellRendererText(),
                                     text=2)
         column.set_sort_column_id(2)
         column.set_clickable(False)
-        treeview_msg.append_column(column)
+        treeview.append_column(column)
         
         #Column FOUR
         column = gtk.TreeViewColumn('Ending', gtk.CellRendererText(),
                                     text=3)
         column.set_sort_column_id(3)
         column.set_clickable(False)
-        treeview_msg.append_column(column)
+        treeview.append_column(column)
         
         #Column FIVE
         column = gtk.TreeViewColumn('Time', gtk.CellRendererText(),
                                     text=4)
         column.set_sort_column_id(4)
         column.set_clickable(False)
-        treeview_msg.append_column(column)
+        treeview.append_column(column)
  
-    def add_bc_columns(self, treeview_bc):
+    def add_bc_columns(self, treeview):
         '''
         Columns for the broadcast list
         '''
@@ -1075,21 +1085,21 @@ class ThreeD_Player():
         column.set_clickable(False)
         column.set_sizing(gtk.TREE_VIEW_COLUMN_FIXED)
         column.set_fixed_width(200)
-        self.treeview_bc.append_column(column)
+        treeview.append_column(column)
         
         #Column THREE
         column = gtk.TreeViewColumn(
             'Time', gtk.CellRendererText(), text=2)
         column.set_sort_column_id(2)
         column.set_clickable(False)
-        self.treeview_bc.append_column(column)
+        treeview.append_column(column)
 
         #Column FOUR
         column = gtk.TreeViewColumn(
             'Joined', gtk.CellRendererToggle(), active=3)
         column.set_sort_column_id(3)
         column.set_visible(False)
-        self.treeview_bc.append_column(column)        
+        treeview.append_column(column)        
 
 
         #Column FIVE
@@ -1101,9 +1111,9 @@ class ThreeD_Player():
         column.set_clickable(False)
         #column.set_sizing(gtk.TREE_VIEW_COLUMN_FIXED)
         #column.set_fixed_width(26)
-        self.treeview_bc.append_column(column)
+        treeview.append_column(column)
         
-    def add_sch_columns(self, treeview_sch):
+    def add_sch_columns(self, treeview):
         '''
         Columns for the schedule list
         '''
@@ -1119,7 +1129,7 @@ class ThreeD_Player():
                                      text=1)
         column.set_sort_column_id(1)
         column.set_clickable(False)
-        self.treeview_sch.append_column(column)
+        treeview.append_column(column)
 
         #Column THREE
         column = gtk.TreeViewColumn('Programme', gtk.CellRendererText(),
@@ -1127,7 +1137,7 @@ class ThreeD_Player():
         column.set_sort_column_id(2)
         column.set_clickable(False)
         column.set_resizable(True)
-        self.treeview_sch.append_column(column)
+        treeview.append_column(column)
         
         #Column FOUR
         column = gtk.TreeViewColumn('Message', gtk.CellRendererText(),
@@ -1135,7 +1145,7 @@ class ThreeD_Player():
         column.set_sort_column_id(3)
         column.set_clickable(False)
         column.set_resizable(True)
-        self.treeview_sch.append_column(column)     
+        treeview.append_column(column)     
 
     def add_cat_columns(self, treeview):
         '''
@@ -1437,21 +1447,27 @@ class ThreeD_Player():
         #clear existing rows
         model.clear()
         #add new rows
-        for item in messages:
-            msg = "msg"
-            code = item[0]
-            filename = item[1]
-            title = item[2]
-            nq = item[3]
-            producer = item[4]
-            duration = item[5]
+        for item in messages:            
+            keylist = list(item.keys())
+            item_dict = {}
+            
+            for key in keylist:
+                item_dict[key] = item[key]
+                    
+            item_dict['logkey'] = "msg"
+            pickle_list = pickle.dumps(item_dict)            
+            code = item['code']
+            title = item['title']
+            nq = item['nq']
+            producer = item['producer']
+            duration = item['duration']
 
             if duration:
                 time = self.convert_time(duration)
             else:
                 time = "NA"
 
-            row = (msg, code, filename, title, nq, msg_type, producer, time, duration)
+            row = (pickle_list, code, title, nq, producer, duration)
             model.append(row)
 
     # music catalogue section       
@@ -1548,22 +1564,28 @@ class ThreeD_Player():
         '''
         self.clear_cat_list()
         var_album = ""
-        mus = "mus"
         model = self.treeview_cat.get_model()
         for item in result:
-            album = item[6]
-            track_id = str(item[0])
-            cd_code = str(format(item[1], '07d'))
-            track_no = str(format(item[2], '02d'))
-            cd_track_code = cd_code + "-" + track_no
-            title = item[3]
-            tr_artist = item[4]
-            artist = item[5]
+            model = self.treeview_cat.get_model()
+            item_dict = {}
+            
+            keylist = list(item.keys())
+            for key in keylist:
+                item_dict[key] = item[key]
+            
+            
+            pickle_list = pickle.dumps(item_dict)
+            item_dict['logkey'] = "mus"
+            album = item['album']            
+            title = item['title']
+            tr_artist = item['trackartist']
+            artist = item['artist']
+            
             if not tr_artist:
                 tr_artist = artist
                 
-            company = item[7]
-            int_time = item[8]
+            int_time = item['tracklength']
+            int_time = int(int_time)
             dur_time = self.convert_time(int_time)
             
             if not album:
@@ -1575,6 +1597,14 @@ class ThreeD_Player():
             else:
                 model.append(n, [mus, track_id, cd_track_code, title, tr_artist, album, company, dur_time, int_time])
             var_album = album
+            
+            
+                        '''            
+            cd_code = str(format(item[1], '07d'))
+            track_no = str(format(item[2], '02d'))
+            cd_track_code = cd_code + "-" + track_no
+            '''
+            
 
     def advanced_search(self, widget):
         '''
@@ -2990,7 +3020,7 @@ TO FIX
 search
 		fix to allow apostrophes
 schedule
-    lists in wrong orfer - mixes nq and sponsorship 
+    lists in wrong order - mixes nq and sponsorship 
         when not listed beside show name
     'next message' button
     keyboard schortcuts for all schedule buttons.
