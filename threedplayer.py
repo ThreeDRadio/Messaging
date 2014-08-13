@@ -1,14 +1,5 @@
 #!/usr/bin/python2
-'''message_player-0.2.py
-retrieves message info from database.
-Displays message types as buttons on left pane.
-displays messages of a given type on centre pane
-Displays selected/dragged messages ona left pane
-Functioning scheduler
-playback working from preview and broadcast
-implements broadcast from serial signal 
-using subprocess and dbus
-has 'join' feature to link tracks. integrates with dnd
+'''
 '''
 
 import pygtk
@@ -1605,7 +1596,6 @@ class ThreeD_Player():
             cd_track_code = cd_code + "-" + track_no
             '''
             
-
     def advanced_search(self, widget):
         '''
         run functions to get the advanced search input, query the database 
