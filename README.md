@@ -1,4 +1,4 @@
 Messaging
 =========
 
-Software for managing messages and music catalogue
+Software for managing messages and music catalogue.
