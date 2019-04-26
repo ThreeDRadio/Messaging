@@ -91,6 +91,7 @@
               <object class="GtkNotebook" id="notebook">
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
+                <signal name="change-current-page" handler="on_notebook_change_current_page" swapped="no"/>
                 <child>
                   <object class="GtkBox" id="box_msg">
                     <property name="visible">True</property>
