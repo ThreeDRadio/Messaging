@@ -12,35 +12,50 @@
     <property name="step_increment">1</property>
     <property name="page_increment">10</property>
   </object>
-  <object class="GtkListStore" id="liststore_brc"/>
-  <object class="GtkListStore" id="liststore_cat"/>
+  <object class="GtkListStore" id="liststore_brc">
+    <columns>
+      <!-- column-name Track -->
+      <column type="gchararray"/>
+      <!-- column-name Time -->
+      <column type="gchararray"/>
+      <!-- column-name Grouping -->
+      <column type="GdkPixbuf"/>
+    </columns>
+  </object>
+  <object class="GtkListStore" id="liststore_cat">
+    <columns>
+      <!-- column-name Album/Title -->
+      <column type="gchararray"/>
+      <!-- column-name Artist -->
+      <column type="gchararray"/>
+      <!-- column-name Time -->
+      <column type="gchararray"/>
+    </columns>
+  </object>
   <object class="GtkListStore" id="liststore_msg">
     <columns>
-      <!-- column-name msg -->
-      <column type="gchararray"/>
       <!-- column-name CODE -->
       <column type="gchararray"/>
-      <!-- column-name Filename -->
+      <!-- column-name Message -->
+      <column type="gchararray"/>
+      <!-- column-name Ending -->
+      <column type="gchararray"/>
+      <!-- column-name Time -->
+      <column type="gchararray"/>
+    </columns>
+  </object>
+  <object class="GtkListStore" id="liststore_sch">
+    <columns>
+      <!-- column-name Time -->
+      <column type="gchararray"/>
+      <!-- column-name Programme -->
+      <column type="gchararray"/>
+      <!-- column-name ID Code -->
       <column type="gchararray"/>
       <!-- column-name Message -->
       <column type="gchararray"/>
     </columns>
-    <data>
-      <row>
-        <col id="0" translatable="yes">One</col>
-        <col id="1" translatable="yes">IDCode</col>
-        <col id="2" translatable="yes">message.mp3</col>
-        <col id="3" translatable="yes">FirstMessage</col>
-      </row>
-      <row>
-        <col id="0" translatable="yes">Two</col>
-        <col id="1" translatable="yes">IDC02</col>
-        <col id="2" translatable="yes">message2.mp3</col>
-        <col id="3" translatable="yes">SecondMessage</col>
-      </row>
-    </data>
   </object>
-  <object class="GtkListStore" id="liststore_sch"/>
   <object class="GtkWindow" id="window">
     <property name="name">window</property>
     <property name="can_focus">False</property>
@@ -132,6 +147,10 @@ Report to
                   <object class="GtkLabel" id="label_msg">
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
+                    <property name="margin_left">2</property>
+                    <property name="margin_right">2</property>
+                    <property name="margin_top">2</property>
+                    <property name="margin_bottom">2</property>
                     <property name="label" translatable="yes">Messages</property>
                     <attributes>
                       <attribute name="font-desc" value="Sans Bold 14"/>
@@ -509,6 +528,10 @@ Report to
                   <object class="GtkLabel" id="label_cat">
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
+                    <property name="margin_left">2</property>
+                    <property name="margin_right">2</property>
+                    <property name="margin_top">2</property>
+                    <property name="margin_bottom">2</property>
                     <property name="label" translatable="yes">Music Catalogue</property>
                     <attributes>
                       <attribute name="font-desc" value="Sans Bold 14"/>
@@ -563,6 +586,10 @@ Report to
                   <object class="GtkLabel" id="label_lst">
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
+                    <property name="margin_left">2</property>
+                    <property name="margin_right">2</property>
+                    <property name="margin_top">2</property>
+                    <property name="margin_bottom">2</property>
                     <property name="label" translatable="yes">Import List</property>
                     <attributes>
                       <attribute name="font-desc" value="Sans Bold 14"/>
@@ -598,7 +625,10 @@ Report to
                           <object class="GtkLabel" id="label_sch">
                             <property name="visible">True</property>
                             <property name="can_focus">False</property>
-                            <property name="xpad">10</property>
+                            <property name="margin_left">2</property>
+                            <property name="margin_right">2</property>
+                            <property name="margin_top">2</property>
+                            <property name="margin_bottom">2</property>
                             <property name="label" translatable="yes">Schedule</property>
                             <attributes>
                               <attribute name="font-desc" value="Sans Bold 14"/>
@@ -701,7 +731,10 @@ Report to
                           <object class="GtkLabel" id="label_pre">
                             <property name="visible">True</property>
                             <property name="can_focus">False</property>
-                            <property name="xpad">10</property>
+                            <property name="margin_left">6</property>
+                            <property name="margin_right">6</property>
+                            <property name="margin_top">2</property>
+                            <property name="margin_bottom">2</property>
                             <property name="label" translatable="yes">Preview</property>
                             <attributes>
                               <attribute name="font-desc" value="Sans Bold 14"/>
@@ -770,6 +803,9 @@ Report to
                       <object class="GtkScale" id="scale_pre">
                         <property name="visible">True</property>
                         <property name="can_focus">True</property>
+                        <property name="margin_left">2</property>
+                        <property name="margin_right">2</property>
+                        <property name="margin_top">4</property>
                         <property name="adjustment">adjustment_pre</property>
                         <property name="fill_level">100</property>
                         <property name="digits">0</property>
@@ -785,6 +821,8 @@ Report to
                       <object class="GtkLabel" id="label_pre_playtime">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
+                        <property name="margin_left">2</property>
+                        <property name="margin_right">2</property>
                         <property name="label" translatable="yes">00:00 / 00:00</property>
                       </object>
                       <packing>
@@ -797,7 +835,14 @@ Report to
                       <object class="GtkLabel" id="label_date">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
-                        <property name="label" translatable="yes">Date</property>
+                        <property name="margin_left">2</property>
+                        <property name="margin_right">2</property>
+                        <property name="margin_top">12</property>
+                        <property name="margin_bottom">6</property>
+                        <property name="label" translatable="yes">Wednesday 26 July</property>
+                        <attributes>
+                          <attribute name="font-desc" value="Sans Bold 12"/>
+                        </attributes>
                       </object>
                       <packing>
                         <property name="expand">False</property>
@@ -809,7 +854,14 @@ Report to
                       <object class="GtkLabel" id="label_time">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
-                        <property name="label" translatable="yes">Time</property>
+                        <property name="margin_left">2</property>
+                        <property name="margin_right">2</property>
+                        <property name="margin_top">6</property>
+                        <property name="margin_bottom">12</property>
+                        <property name="label" translatable="yes">07:00 AM</property>
+                        <attributes>
+                          <attribute name="font-desc" value="Sans Bold 14"/>
+                        </attributes>
                       </object>
                       <packing>
                         <property name="expand">False</property>
@@ -850,6 +902,10 @@ Report to
               <object class="GtkLabel" id="label_brc">
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
+                <property name="margin_left">2</property>
+                <property name="margin_right">2</property>
+                <property name="margin_top">2</property>
+                <property name="margin_bottom">2</property>
                 <property name="label" translatable="yes">Broadcast List</property>
                 <attributes>
                   <attribute name="font-desc" value="Sans Bold 14"/>
@@ -866,8 +922,8 @@ Report to
               <object class="GtkLabel" id="label_air">
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
-                <property name="margin_top">8</property>
-                <property name="margin_bottom">8</property>
+                <property name="margin_top">10</property>
+                <property name="margin_bottom">10</property>
                 <property name="label" translatable="yes">Off Air</property>
                 <attributes>
                   <attribute name="font-desc" value="Sans Bold 16"/>
@@ -906,7 +962,14 @@ Report to
                   <object class="GtkLabel" id="label_brc_playtime">
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
+                    <property name="margin_left">2</property>
+                    <property name="margin_right">2</property>
+                    <property name="margin_top">2</property>
+                    <property name="margin_bottom">2</property>
                     <property name="label" translatable="yes">0:00</property>
+                    <attributes>
+                      <attribute name="font-desc" value="Sans Bold 14"/>
+                    </attributes>
                   </object>
                   <packing>
                     <property name="expand">True</property>
@@ -1058,8 +1121,12 @@ Report to
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
                 <property name="halign">end</property>
+                <property name="margin_left">2</property>
+                <property name="margin_right">2</property>
+                <property name="margin_top">2</property>
+                <property name="margin_bottom">2</property>
                 <property name="hexpand">True</property>
-                <property name="label" translatable="yes">Playlist Total Time ... 0:00</property>
+                <property name="label" translatable="yes">Playlist Total Time ... 00:00</property>
                 <property name="justify">right</property>
               </object>
               <packing>
