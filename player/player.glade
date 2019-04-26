@@ -32,6 +32,20 @@
       <column type="gchararray"/>
     </columns>
   </object>
+  <object class="GtkListStore" id="liststore_list_select">
+    <columns>
+      <!-- column-name Title -->
+      <column type="gchararray"/>
+      <!-- column-name Artist -->
+      <column type="gchararray"/>
+      <!-- column-name Album -->
+      <column type="gchararray"/>
+      <!-- column-name Time -->
+      <column type="gchararray"/>
+      <!-- column-name < define a new column >1 -->
+      <column type="&lt; define a new column &gt;"/>
+    </columns>
+  </object>
   <object class="GtkListStore" id="liststore_msg">
     <columns>
       <!-- column-name CODE -->
@@ -50,7 +64,7 @@
       <column type="gchararray"/>
       <!-- column-name Programme -->
       <column type="gchararray"/>
-      <!-- column-name ID Code -->
+      <!-- column-name ID -->
       <column type="gchararray"/>
       <!-- column-name Message -->
       <column type="gchararray"/>
@@ -187,6 +201,7 @@ Report to
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
                             <property name="receives_default">True</property>
+                            <signal name="clicked" handler="on_button_cat_simple_clicked" swapped="no"/>
                           </object>
                           <packing>
                             <property name="left_attach">3</property>
@@ -468,6 +483,7 @@ Report to
                             <property name="receives_default">True</property>
                             <property name="halign">end</property>
                             <property name="valign">start</property>
+                            <signal name="clicked" handler="on_button_cat_adv_clicked" swapped="no"/>
                           </object>
                           <packing>
                             <property name="left_attach">3</property>
@@ -560,6 +576,7 @@ Report to
                               <object class="GtkTreeView" id="treeview_list_select">
                                 <property name="visible">True</property>
                                 <property name="can_focus">True</property>
+                                <property name="model">liststore_list_select</property>
                                 <child internal-child="selection">
                                   <object class="GtkTreeSelection"/>
                                 </child>
@@ -575,7 +592,96 @@ Report to
                       </packing>
                     </child>
                     <child>
-                      <placeholder/>
+                      <object class="GtkBox">
+                        <property name="visible">True</property>
+                        <property name="can_focus">False</property>
+                        <property name="orientation">vertical</property>
+                        <child>
+                          <object class="GtkScrolledWindow" id="scr_list">
+                            <property name="visible">True</property>
+                            <property name="can_focus">True</property>
+                            <property name="shadow_type">in</property>
+                            <child>
+                              <object class="GtkViewport" id="viewport_list">
+                                <property name="visible">True</property>
+                                <property name="can_focus">False</property>
+                                <child>
+                                  <object class="GtkTreeView" id="treeview_list">
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">True</property>
+                                    <property name="hexpand">False</property>
+                                    <property name="vexpand">False</property>
+                                    <child internal-child="selection">
+                                      <object class="GtkTreeSelection"/>
+                                    </child>
+                                  </object>
+                                </child>
+                              </object>
+                            </child>
+                          </object>
+                          <packing>
+                            <property name="expand">True</property>
+                            <property name="fill">True</property>
+                            <property name="position">0</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkBox">
+                            <property name="visible">True</property>
+                            <property name="can_focus">False</property>
+                            <child>
+                              <object class="GtkButton" id="button_list_all">
+                                <property name="label" translatable="yes">Add All</property>
+                                <property name="visible">True</property>
+                                <property name="can_focus">True</property>
+                                <property name="receives_default">True</property>
+                                <property name="halign">end</property>
+                                <property name="valign">baseline</property>
+                                <property name="margin_left">2</property>
+                                <property name="margin_right">2</property>
+                                <property name="margin_top">2</property>
+                                <property name="margin_bottom">2</property>
+                                <signal name="clicked" handler="on_button_list_all_clicked" swapped="no"/>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">False</property>
+                                <property name="position">0</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkButton" id="button_list_sel">
+                                <property name="label" translatable="yes">Add Selected</property>
+                                <property name="visible">True</property>
+                                <property name="can_focus">True</property>
+                                <property name="receives_default">True</property>
+                                <property name="halign">end</property>
+                                <property name="valign">baseline</property>
+                                <property name="margin_left">2</property>
+                                <property name="margin_right">2</property>
+                                <property name="margin_top">2</property>
+                                <property name="margin_bottom">2</property>
+                                <signal name="clicked" handler="on_button_list_sel_clicked" swapped="no"/>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">False</property>
+                                <property name="position">1</property>
+                              </packing>
+                            </child>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">1</property>
+                          </packing>
+                        </child>
+                      </object>
+                      <packing>
+                        <property name="expand">True</property>
+                        <property name="fill">True</property>
+                        <property name="position">1</property>
+                      </packing>
                     </child>
                   </object>
                   <packing>
@@ -606,6 +712,21 @@ Report to
                 <property name="expand">True</property>
                 <property name="fill">True</property>
                 <property name="position">0</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkSeparator">
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+                <property name="margin_left">2</property>
+                <property name="margin_right">2</property>
+                <property name="margin_top">4</property>
+                <property name="margin_bottom">4</property>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">True</property>
+                <property name="position">1</property>
               </packing>
             </child>
             <child>
@@ -647,9 +768,10 @@ Report to
                             <property name="can_focus">True</property>
                             <property name="receives_default">True</property>
                             <property name="margin_left">2</property>
-                            <property name="margin_right">2</property>
+                            <property name="margin_right">8</property>
                             <property name="margin_top">2</property>
                             <property name="margin_bottom">2</property>
+                            <signal name="clicked" handler="on_button_sch_add_clicked" swapped="no"/>
                           </object>
                           <packing>
                             <property name="expand">False</property>
@@ -668,6 +790,7 @@ Report to
                             <property name="margin_right">2</property>
                             <property name="margin_top">2</property>
                             <property name="margin_bottom">2</property>
+                            <signal name="clicked" handler="on_button_sch_now_clicked" swapped="no"/>
                           </object>
                           <packing>
                             <property name="expand">False</property>
@@ -719,6 +842,22 @@ Report to
                   </packing>
                 </child>
                 <child>
+                  <object class="GtkSeparator">
+                    <property name="visible">True</property>
+                    <property name="can_focus">False</property>
+                    <property name="margin_left">4</property>
+                    <property name="margin_right">4</property>
+                    <property name="margin_top">2</property>
+                    <property name="margin_bottom">2</property>
+                    <property name="orientation">vertical</property>
+                  </object>
+                  <packing>
+                    <property name="expand">False</property>
+                    <property name="fill">True</property>
+                    <property name="position">1</property>
+                  </packing>
+                </child>
+                <child>
                   <object class="GtkBox" id="box_pre">
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
@@ -754,6 +893,7 @@ Report to
                             <property name="margin_top">2</property>
                             <property name="margin_bottom">2</property>
                             <property name="always_show_image">True</property>
+                            <signal name="clicked" handler="on_button_pre_stop_clicked" swapped="no"/>
                             <child>
                               <object class="GtkImage">
                                 <property name="visible">True</property>
@@ -777,6 +917,7 @@ Report to
                             <property name="margin_top">2</property>
                             <property name="margin_bottom">2</property>
                             <property name="always_show_image">True</property>
+                            <signal name="clicked" handler="on_button_pre_play_clicked" swapped="no"/>
                             <child>
                               <object class="GtkImage" id="image_pre_play">
                                 <property name="visible">True</property>
@@ -810,6 +951,7 @@ Report to
                         <property name="fill_level">100</property>
                         <property name="digits">0</property>
                         <property name="draw_value">False</property>
+                        <signal name="move-slider" handler="on_scale_pre_move_slider" swapped="no"/>
                       </object>
                       <packing>
                         <property name="expand">False</property>
@@ -827,7 +969,7 @@ Report to
                       </object>
                       <packing>
                         <property name="expand">False</property>
-                        <property name="fill">True</property>
+                        <property name="fill">False</property>
                         <property name="position">2</property>
                       </packing>
                     </child>
@@ -873,14 +1015,14 @@ Report to
                   <packing>
                     <property name="expand">False</property>
                     <property name="fill">True</property>
-                    <property name="position">1</property>
+                    <property name="position">2</property>
                   </packing>
                 </child>
               </object>
               <packing>
                 <property name="expand">True</property>
                 <property name="fill">True</property>
-                <property name="position">1</property>
+                <property name="position">2</property>
               </packing>
             </child>
           </object>
@@ -889,6 +1031,22 @@ Report to
             <property name="fill">True</property>
             <property name="padding">2</property>
             <property name="position">0</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkSeparator">
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+            <property name="margin_left">4</property>
+            <property name="margin_right">4</property>
+            <property name="margin_top">2</property>
+            <property name="margin_bottom">2</property>
+            <property name="orientation">vertical</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+            <property name="position">1</property>
           </packing>
         </child>
         <child>
@@ -984,6 +1142,7 @@ Report to
                     <property name="visible">True</property>
                     <property name="can_focus">True</property>
                     <property name="receives_default">True</property>
+                    <signal name="clicked" handler="on_button_brc_skip_clicked" swapped="no"/>
                   </object>
                   <packing>
                     <property name="expand">False</property>
@@ -1011,6 +1170,7 @@ Report to
                     <property name="visible">True</property>
                     <property name="can_focus">True</property>
                     <property name="receives_default">True</property>
+                    <signal name="clicked" handler="on_button_info_clicked" swapped="no"/>
                   </object>
                   <packing>
                     <property name="expand">False</property>
@@ -1025,6 +1185,7 @@ Report to
                     <property name="visible">True</property>
                     <property name="can_focus">True</property>
                     <property name="receives_default">True</property>
+                    <signal name="clicked" handler="on_button_remove_clicked" swapped="no"/>
                   </object>
                   <packing>
                     <property name="expand">False</property>
@@ -1039,6 +1200,7 @@ Report to
                     <property name="visible">True</property>
                     <property name="can_focus">True</property>
                     <property name="receives_default">True</property>
+                    <signal name="clicked" handler="on_button_msg3_clicked" swapped="no"/>
                   </object>
                   <packing>
                     <property name="expand">False</property>
@@ -1053,6 +1215,7 @@ Report to
                     <property name="visible">True</property>
                     <property name="can_focus">True</property>
                     <property name="receives_default">True</property>
+                    <signal name="clicked" handler="on_button_history_clicked" swapped="no"/>
                   </object>
                   <packing>
                     <property name="expand">False</property>
@@ -1140,7 +1303,7 @@ Report to
             <property name="expand">False</property>
             <property name="fill">True</property>
             <property name="padding">2</property>
-            <property name="position">1</property>
+            <property name="position">2</property>
           </packing>
         </child>
       </object>
