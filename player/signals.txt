@@ -1,0 +1,16 @@
+on_button_sch_now_clicked
+on_button_sch_add_clicked
+on_button_pre_play_clicked
+on_button_pre_stop_clicked
+on_button_brc_skip_clicked
+on_button_info_clicked
+on_button_remove_clicked
+on_button_msg3_clicked
+on_button_history_clicked
+on_button_cat_simple_clicked
+on_button_cat_adv_clicked
+on_button_list_all_clicked
+on_button_list_sel_clicked
+
+on_notebook_change_current_page
+on_scale_pre_move_slider
