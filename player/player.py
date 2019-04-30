@@ -1,5 +1,12 @@
+#!/usr/bin/env python3
+
+import gi
+gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib, GdkPixbuf
 
+import queries
+
+query = queries.Queries()
 
 #import dialogs
 #from dialogs import ComputerList
@@ -13,7 +20,34 @@ class Player(object):
         
         # Main window widgets
         self.window = go("window")
+        self.box_msgtype = go('box_msgtype')  
+        self.make_buttons()
+        
+        # Messages widgets
+        
+    def make_buttons(self):
+        '''
+        create a button for each type of message
+        '''
+        ls_btn = self.box_msgtype.get_children()
+        if ls_btn:
+            for item in ls_btn:
+                self.box_msgtype.remove(item)
+                
+        type_rows = query.get_types()
 
+        for msg_type in type_rows:
+            button_id = msg_type[0]
+            print(button_id)
+            self.button = Gtk.Button.new_with_label(button_id)
+            #button.set_size_request(215, 30)
+            #size fill as True, expand as False
+            tooltip = msg_type[1]
+            print(tooltip)
+            self.button.set_tooltip_text(tooltip)
+            #button.connect("clicked", self.msg_btn_clicked, button_id)
+            self.button.connect("clicked", self.on_button_msg_clicked, button_id)
+            self.box_msgtype.pack_start(self.button, False, True, 0)
         
         # Messages widgets
 
@@ -23,13 +57,16 @@ class Player(object):
         
         # Load Playlist widgets
 
-        self.window.show()
+        self.window.show_all()
 
 
     # ----- Window signal handlers -----
 
     def on_window_destroy(self, widget):
         Gtk.main_quit()
+
+    def on_button_msg_clicked(self, widget, button_id):
+        print(button_id)
         
     def on_button_sch_now_clicked(self, widget): 
         print("on_button_sch_now_clicked")   
