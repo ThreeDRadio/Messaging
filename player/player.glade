@@ -42,7 +42,7 @@
       <column type="gchararray"/>
       <!-- column-name Time -->
       <column type="gchararray"/>
-      <!-- column-name < define a new column >1 -->
+      <!-- column-name < -->
       <column type="&lt; define a new column &gt;"/>
     </columns>
   </object>
@@ -101,19 +101,32 @@
                         <property name="width_request">100</property>
                         <property name="visible">True</property>
                         <property name="can_focus">True</property>
+                        <property name="hscrollbar_policy">never</property>
                         <property name="shadow_type">in</property>
                         <child>
                           <object class="GtkViewport" id="viewport_msgtype">
                             <property name="visible">True</property>
                             <property name="can_focus">False</property>
                             <child>
-                              <object class="GtkButton" id="button_temp">
-                                <property name="label" translatable="yes">Error:
+                              <object class="GtkBox" id="box_msgtype">
+                                <property name="visible">True</property>
+                                <property name="can_focus">False</property>
+                                <property name="orientation">vertical</property>
+                                <child>
+                                  <object class="GtkButton" id="button_temp">
+                                    <property name="label" translatable="yes">Error:
 Report to
 3D techs</property>
-                                <property name="visible">True</property>
-                                <property name="can_focus">True</property>
-                                <property name="receives_default">True</property>
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">True</property>
+                                    <property name="receives_default">True</property>
+                                  </object>
+                                  <packing>
+                                    <property name="expand">False</property>
+                                    <property name="fill">True</property>
+                                    <property name="position">0</property>
+                                  </packing>
+                                </child>
                               </object>
                             </child>
                           </object>
