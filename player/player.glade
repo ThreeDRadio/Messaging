@@ -924,14 +924,11 @@ Report to
                           </packing>
                         </child>
                         <child>
-                          <object class="GtkButton" id="button_pre_play">
+                          <object class="GtkToggleButton" id="togglebutton_pre_playpause">
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
                             <property name="receives_default">True</property>
-                            <property name="margin_top">2</property>
-                            <property name="margin_bottom">2</property>
-                            <property name="always_show_image">True</property>
-                            <signal name="clicked" handler="on_button_pre_play_clicked" swapped="no"/>
+                            <signal name="toggled" handler="on_togglebutton_pre_playpause_toggled" swapped="no"/>
                             <child>
                               <object class="GtkImage" id="image_pre_play">
                                 <property name="visible">True</property>

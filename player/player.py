@@ -76,8 +76,8 @@ class Player(object):
         print("on_button_sch_add_clicked")
         # add the selected message to the broadcast list
 
-    def on_button_pre_play_clicked(self, widget): 
-        print("on_button_pre_play_clicked")
+    def on_togglebutton_pre_playpause_toggled(self, widget): 
+        print("on_togglebutton_pre_playpause_toggled")
         # play/pause the selected item
 
     def on_button_pre_stop_clicked(self, widget): 
