@@ -33,17 +33,16 @@ class Player(object):
         if ls_btn:
             for item in ls_btn:
                 self.box_msgtype.remove(item)
-                
+        
+        
         type_rows = query.get_types()
 
         for msg_type in type_rows:
-            button_id = msg_type[0]
-            print(button_id)
+            button_id = msg_type['type']
             self.button = Gtk.Button.new_with_label(button_id)
             #button.set_size_request(215, 30)
             #size fill as True, expand as False
-            tooltip = msg_type[1]
-            print(tooltip)
+            tooltip = msg_type['description']
             self.button.set_tooltip_text(tooltip)
             #button.connect("clicked", self.msg_btn_clicked, button_id)
             self.button.connect("clicked", self.on_button_msg_clicked, button_id)
@@ -67,6 +66,7 @@ class Player(object):
 
     def on_button_msg_clicked(self, widget, button_id):
         print(button_id)
+        self.list_messages(button_id)
         
     def on_button_sch_now_clicked(self, widget): 
         print("on_button_sch_now_clicked")   
@@ -129,9 +129,22 @@ class Player(object):
         # move to relative place in the audio file
 
 
+    # ----- Message Tab -----result_dict
 
-
-
+    def list_messages(self, msgtype):
+        messages = query.get_messages(msgtype)
+        for message in messages:
+            code = message['code']
+            title = message['title']
+            print (f"{code} {title}")
+        
+    '''
+    turn into true dictionary like this
+    m = []
+    for row in messages:
+    m.append(dict(row))
+    '''
+            
 
 
 
