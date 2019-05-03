@@ -11,6 +11,8 @@ query = queries.Queries()
 #import dialogs
 #from dialogs import ComputerList
 
+
+
 class Player(object):
     def __init__(self):
         self.builder = Gtk.Builder()
@@ -24,6 +26,10 @@ class Player(object):
         self.make_buttons()
         
         # Messages widgets
+        self.liststore_msg = go("liststore_msg")
+        self.treeview_msg = go('treeview_msg')
+        self.displayed_messages = []
+        self.window.show_all()
         
     def make_buttons(self):
         '''
@@ -56,7 +62,7 @@ class Player(object):
         
         # Load Playlist widgets
 
-        self.window.show_all()
+
 
 
     # ----- Window signal handlers -----
@@ -129,30 +135,76 @@ class Player(object):
         # move to relative place in the audio file
 
 
-    # ----- Message Tab -----result_dict
+    # ----- Message Tab -----
+
+    def create_msg_columns(self, treeview_msg):
+        '''
+        columns for the list of messages
+        '''
+        # column ZERO
+        column = gtk.TreeViewColumn('Code', gtk.CellRendererText(),
+                                    text=0)
+        column.set_sort_column_id(0)
+        column.set_clickable(False)
+        self.treeview_msg.append_column(column)
+        
+        #Column ONE
+        column = gtk.TreeViewColumn('Message', gtk.CellRendererText(),
+                                    text=1)
+        column.set_sort_column_id(1)
+        column.set_clickable(False)
+        treeview_msg.append_column(column)
+        
+        #Column TWO
+        column = gtk.TreeViewColumn('Ending', gtk.CellRendererText(),
+                                    text=2)
+        column.set_sort_column_id(2)
+        column.set_clickable(False)
+        treeview_msg.append_column(column)
+        
+        #Column THREE
+        column = gtk.TreeViewColumn('Time', gtk.CellRendererText(),
+                                    text=3)
+        column.set_sort_column_id(3)
+        column.set_clickable(False)
+        treeview_msg.append_column(column)
+        
 
     def list_messages(self, msgtype):
+        '''
+        get messages of the selected type and display as a list
+        '''
+        self.liststore_msg.clear()
         messages = query.get_messages(msgtype)
         for message in messages:
+            self.displayed_messages.append(dict(message))
             code = message['code']
             title = message['title']
-            print (f"{code} {title}")
-        
-    '''
-    turn into true dictionary like this
-    m = []
-    for row in messages:
-    m.append(dict(row))
-    '''
+            nq = message['nq']
+            duration = message['duration']
             
+            if duration:
+                str_duration = self.convert_time(duration)
+            else:
+                str_duration = "NA"
+                
+            row = (code, title, nq, str_duration)
+            print(row)
+            self.liststore_msg.append(row)
 
 
+    #common functions
+    def convert_time(self, duration):
+        s = int(duration)
+        m,s = divmod(s, 60)
 
-
-
-
-
-
+        if m < 60:
+            str_duration = "%02i:%02i" %(m,s)
+            return str_duration
+        else:
+            h,m = divmod(m, 60)
+            str_duration = "%i:%02i:%02i" %(h,m,s)
+            return str_duration   
 
 
 
