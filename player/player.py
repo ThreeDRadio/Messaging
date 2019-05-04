@@ -23,11 +23,12 @@ class Player(object):
         # Main window widgets
         self.window = go("window")
         self.box_msgtype = go('box_msgtype')  
-        self.make_buttons()
-        
+        self.make_buttons()     
         # Messages widgets
         self.liststore_msg = go("liststore_msg")
+        #self.liststore_msg = Gtk.ListStore(str, str, str, str)
         self.treeview_msg = go('treeview_msg')
+        self.create_msg_columns()   
         self.displayed_messages = []
         self.window.show_all()
         
@@ -91,7 +92,7 @@ class Player(object):
         # stop playing
 
     def on_button_brc_skip_clicked(self, widget): 
-        print("on_button_brc_skip_clicked")
+        print("on_button_brc_skip_clic  ked")
         # stop playing the broadcasted item
 
     def on_button_info_clicked(self, widget): 
@@ -137,37 +138,37 @@ class Player(object):
 
     # ----- Message Tab -----
 
-    def create_msg_columns(self, treeview_msg):
+    def create_msg_columns(self):
         '''
         columns for the list of messages
         '''
         # column ZERO
-        column = gtk.TreeViewColumn('Code', gtk.CellRendererText(),
+        column = Gtk.TreeViewColumn('Code', Gtk.CellRendererText(),
                                     text=0)
         column.set_sort_column_id(0)
         column.set_clickable(False)
         self.treeview_msg.append_column(column)
         
         #Column ONE
-        column = gtk.TreeViewColumn('Message', gtk.CellRendererText(),
+        column = Gtk.TreeViewColumn('Message', Gtk.CellRendererText(),
                                     text=1)
         column.set_sort_column_id(1)
         column.set_clickable(False)
-        treeview_msg.append_column(column)
+        self.treeview_msg.append_column(column)
         
         #Column TWO
-        column = gtk.TreeViewColumn('Ending', gtk.CellRendererText(),
+        column = Gtk.TreeViewColumn('Ending', Gtk.CellRendererText(),
                                     text=2)
         column.set_sort_column_id(2)
         column.set_clickable(False)
-        treeview_msg.append_column(column)
+        self.treeview_msg.append_column(column)
         
         #Column THREE
-        column = gtk.TreeViewColumn('Time', gtk.CellRendererText(),
+        column = Gtk.TreeViewColumn('Time', Gtk.CellRendererText(),
                                     text=3)
         column.set_sort_column_id(3)
         column.set_clickable(False)
-        treeview_msg.append_column(column)
+        self.treeview_msg.append_column(column)
         
 
     def list_messages(self, msgtype):
