@@ -147,6 +147,7 @@ class Player(object):
                                     text=0)
         column.set_sort_column_id(0)
         column.set_clickable(False)
+        column.set_sizing(Gtk.TreeViewColumnSizing.AUTOSIZE)
         self.treeview_msg.append_column(column)
         
         #Column ONE
@@ -154,6 +155,7 @@ class Player(object):
                                     text=1)
         column.set_sort_column_id(1)
         column.set_clickable(False)
+        column.set_sizing(Gtk.TreeViewColumnSizing.AUTOSIZE)
         self.treeview_msg.append_column(column)
         
         #Column TWO
@@ -161,6 +163,7 @@ class Player(object):
                                     text=2)
         column.set_sort_column_id(2)
         column.set_clickable(False)
+        column.set_sizing(Gtk.TreeViewColumnSizing.AUTOSIZE)
         self.treeview_msg.append_column(column)
         
         #Column THREE
@@ -168,6 +171,7 @@ class Player(object):
                                     text=3)
         column.set_sort_column_id(3)
         column.set_clickable(False)
+        column.set_sizing(Gtk.TreeViewColumnSizing.AUTOSIZE)
         self.treeview_msg.append_column(column)
         
 

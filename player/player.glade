@@ -142,6 +142,7 @@ Report to
                       <object class="GtkScrolledWindow" id="scr_msg">
                         <property name="visible">True</property>
                         <property name="can_focus">True</property>
+                        <property name="hscrollbar_policy">never</property>
                         <property name="shadow_type">in</property>
                         <child>
                           <object class="GtkViewport" id="viewport_msg">
@@ -1139,6 +1140,17 @@ Report to
                       </packing>
                     </child>
                     <child>
+                      <object class="GtkSeparator" id="separator_pre">
+                        <property name="visible">True</property>
+                        <property name="can_focus">False</property>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">3</property>
+                      </packing>
+                    </child>
+                    <child>
                       <object class="GtkLabel" id="label_date">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
@@ -1154,7 +1166,7 @@ Report to
                       <packing>
                         <property name="expand">False</property>
                         <property name="fill">True</property>
-                        <property name="position">3</property>
+                        <property name="position">4</property>
                       </packing>
                     </child>
                     <child>
@@ -1173,7 +1185,7 @@ Report to
                       <packing>
                         <property name="expand">False</property>
                         <property name="fill">True</property>
-                        <property name="position">4</property>
+                        <property name="position">5</property>
                       </packing>
                     </child>
                   </object>
@@ -1429,6 +1441,10 @@ Report to
                       <object class="GtkTreeView" id="treeview_brc">
                         <property name="visible">True</property>
                         <property name="can_focus">True</property>
+                        <property name="margin_left">2</property>
+                        <property name="margin_right">2</property>
+                        <property name="margin_top">6</property>
+                        <property name="margin_bottom">6</property>
                         <property name="model">liststore_brc</property>
                         <child internal-child="selection">
                           <object class="GtkTreeSelection"/>
