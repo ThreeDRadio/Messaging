@@ -61,7 +61,7 @@ class Queries():
 
     def get_types(self):
         '''
-        query the database for the different types of messages
+        query to retrieve the different types of messages
         '''
         query = "SELECT type,description FROM typelist ORDER BY type"
         db = "msg"
@@ -70,12 +70,59 @@ class Queries():
         return type_rows
         
     def get_messages(self, msg_type):
+        '''
+        query to retrieve all messages of the specified type
+        '''
         db = "msg"
         query = "SELECT * FROM messagelist WHERE type='{}'".format(msg_type)
         messages = self.select_query(db, query)
         return messages
         
-
+    def get_schedule(self):
+        '''
+        query to return the schedule for the current day
+        starting at 6:00am
+        '''
+        db = "msg"
+        now = datetime.datetime.now()
+        today =  datetime.datetime.combine((now.date()), datetime.time.min)
+        six_hours = datetime.timedelta(hours=6)        
+        one_day = datetime.timedelta(days=1)
+        today_morning = today + six_hours
+        tomorrow_morning = today_morning + one_day
+                
+        query = ("SELECT schedule.time_date,  "
+        "schedule.msg_code, "
+        "messagelist.title, "
+        "messagelist.nq, "
+        "messagelist.type, "
+        "messagelist.filename,  "
+        "messagelist.duration FROM schedule "
+        "JOIN messagelist ON schedule.msg_code=messagelist.code "
+        "WHERE time_date >= '{0}' "
+        "AND time_date < '{1}' "
+        "ORDER BY time_date"
+        ).format(today_morning, tomorrow_morning)
+        schedule = self.select_query(db, query)
+        return schedule
         
+    def get_programmes(self):
+        '''
+        query to return programmes for the current day
+        starting at 6:00am
+        '''
+        db = 'msg'
+        now = datetime.datetime.now()
+        one_day = datetime.timedelta(days=1)
+        today = now.strftime('%A')
+        tomorrow = (now + one_day).strftime('%A')
+        six = datetime.time(hour=6)
+
+        query = ("SELECT code, name, start FROM programmes "
+        "WHERE day='{0}' "
+        "AND start >= '{2}' OR day = '{1}' AND start < '{2}'"
+        ).format(today, tomorrow, six) 
+        programmes = self.select_query(db, query)
+        return programmes
 
 

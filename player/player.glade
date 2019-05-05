@@ -64,9 +64,11 @@
       <column type="gchararray"/>
       <!-- column-name Programme -->
       <column type="gchararray"/>
-      <!-- column-name ID -->
+      <!-- column-name ID Code -->
       <column type="gchararray"/>
       <!-- column-name Message -->
+      <column type="gchararray"/>
+      <!-- column-name time -->
       <column type="gchararray"/>
     </columns>
   </object>
@@ -145,18 +147,12 @@ Report to
                         <property name="hscrollbar_policy">never</property>
                         <property name="shadow_type">in</property>
                         <child>
-                          <object class="GtkViewport" id="viewport_msg">
+                          <object class="GtkTreeView" id="treeview_msg">
                             <property name="visible">True</property>
-                            <property name="can_focus">False</property>
-                            <child>
-                              <object class="GtkTreeView" id="treeview_msg">
-                                <property name="visible">True</property>
-                                <property name="can_focus">True</property>
-                                <property name="model">liststore_msg</property>
-                                <child internal-child="selection">
-                                  <object class="GtkTreeSelection"/>
-                                </child>
-                              </object>
+                            <property name="can_focus">True</property>
+                            <property name="model">liststore_msg</property>
+                            <child internal-child="selection">
+                              <object class="GtkTreeSelection"/>
                             </child>
                           </object>
                         </child>
@@ -682,18 +678,12 @@ Report to
                         <property name="can_focus">True</property>
                         <property name="shadow_type">in</property>
                         <child>
-                          <object class="GtkViewport" id="viewport_cat">
+                          <object class="GtkTreeView" id="treeview_cat">
                             <property name="visible">True</property>
-                            <property name="can_focus">False</property>
-                            <child>
-                              <object class="GtkTreeView" id="treeview_cat">
-                                <property name="visible">True</property>
-                                <property name="can_focus">True</property>
-                                <property name="model">liststore_cat</property>
-                                <child internal-child="selection">
-                                  <object class="GtkTreeSelection"/>
-                                </child>
-                              </object>
+                            <property name="can_focus">True</property>
+                            <property name="model">liststore_cat</property>
+                            <child internal-child="selection">
+                              <object class="GtkTreeSelection"/>
                             </child>
                           </object>
                         </child>
@@ -736,20 +726,15 @@ Report to
                       <object class="GtkScrolledWindow" id="scr_list_select">
                         <property name="visible">True</property>
                         <property name="can_focus">True</property>
+                        <property name="hscrollbar_policy">never</property>
                         <property name="shadow_type">in</property>
                         <child>
-                          <object class="GtkViewport" id="viewport_list_select">
+                          <object class="GtkTreeView" id="treeview_list_select">
                             <property name="visible">True</property>
-                            <property name="can_focus">False</property>
-                            <child>
-                              <object class="GtkTreeView" id="treeview_list_select">
-                                <property name="visible">True</property>
-                                <property name="can_focus">True</property>
-                                <property name="model">liststore_list_select</property>
-                                <child internal-child="selection">
-                                  <object class="GtkTreeSelection"/>
-                                </child>
-                              </object>
+                            <property name="can_focus">True</property>
+                            <property name="model">liststore_list_select</property>
+                            <child internal-child="selection">
+                              <object class="GtkTreeSelection"/>
                             </child>
                           </object>
                         </child>
@@ -769,6 +754,7 @@ Report to
                           <object class="GtkScrolledWindow" id="scr_list">
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
+                            <property name="hscrollbar_policy">never</property>
                             <property name="shadow_type">in</property>
                             <child>
                               <object class="GtkViewport" id="viewport_list">
@@ -979,20 +965,15 @@ Report to
                       <object class="GtkScrolledWindow" id="scr_sch">
                         <property name="visible">True</property>
                         <property name="can_focus">True</property>
+                        <property name="hscrollbar_policy">never</property>
                         <property name="shadow_type">in</property>
                         <child>
-                          <object class="GtkViewport" id="viewport_sch">
+                          <object class="GtkTreeView" id="treeview_sch">
                             <property name="visible">True</property>
-                            <property name="can_focus">False</property>
-                            <child>
-                              <object class="GtkTreeView" id="treeview_sch">
-                                <property name="visible">True</property>
-                                <property name="can_focus">True</property>
-                                <property name="model">liststore_sch</property>
-                                <child internal-child="selection">
-                                  <object class="GtkTreeSelection"/>
-                                </child>
-                              </object>
+                            <property name="can_focus">True</property>
+                            <property name="model">liststore_sch</property>
+                            <child internal-child="selection">
+                              <object class="GtkTreeSelection"/>
                             </child>
                           </object>
                         </child>
@@ -1112,7 +1093,8 @@ Report to
                         <property name="can_focus">True</property>
                         <property name="margin_left">2</property>
                         <property name="margin_right">2</property>
-                        <property name="margin_top">4</property>
+                        <property name="margin_top">6</property>
+                        <property name="margin_bottom">1</property>
                         <property name="adjustment">adjustment_pre</property>
                         <property name="fill_level">100</property>
                         <property name="digits">0</property>
@@ -1131,6 +1113,7 @@ Report to
                         <property name="can_focus">False</property>
                         <property name="margin_left">2</property>
                         <property name="margin_right">2</property>
+                        <property name="margin_bottom">6</property>
                         <property name="label" translatable="yes">00:00 / 00:00</property>
                       </object>
                       <packing>
@@ -1156,7 +1139,7 @@ Report to
                         <property name="can_focus">False</property>
                         <property name="margin_left">2</property>
                         <property name="margin_right">2</property>
-                        <property name="margin_top">12</property>
+                        <property name="margin_top">24</property>
                         <property name="margin_bottom">6</property>
                         <property name="label" translatable="yes">Wednesday 26 July</property>
                         <attributes>
@@ -1234,113 +1217,71 @@ Report to
             <property name="vexpand">False</property>
             <property name="orientation">vertical</property>
             <child>
-              <object class="GtkLabel" id="label_brc">
-                <property name="visible">True</property>
-                <property name="can_focus">False</property>
-                <property name="margin_left">2</property>
-                <property name="margin_right">2</property>
-                <property name="margin_top">2</property>
-                <property name="margin_bottom">2</property>
-                <property name="label" translatable="yes">Broadcast List</property>
-                <attributes>
-                  <attribute name="font-desc" value="Sans Bold 14"/>
-                </attributes>
-              </object>
-              <packing>
-                <property name="expand">False</property>
-                <property name="fill">True</property>
-                <property name="padding">2</property>
-                <property name="position">0</property>
-              </packing>
-            </child>
-            <child>
-              <object class="GtkLabel" id="label_air">
-                <property name="visible">True</property>
-                <property name="can_focus">False</property>
-                <property name="margin_top">10</property>
-                <property name="margin_bottom">10</property>
-                <property name="label" translatable="yes">Off Air</property>
-                <attributes>
-                  <attribute name="font-desc" value="Sans Bold 16"/>
-                </attributes>
-              </object>
-              <packing>
-                <property name="expand">False</property>
-                <property name="fill">True</property>
-                <property name="padding">2</property>
-                <property name="position">1</property>
-              </packing>
-            </child>
-            <child>
-              <object class="GtkProgressBar" id="progress_brc">
-                <property name="height_request">30</property>
-                <property name="visible">True</property>
-                <property name="can_focus">False</property>
-                <property name="margin_left">2</property>
-                <property name="margin_right">2</property>
-                <property name="margin_top">2</property>
-                <property name="margin_bottom">2</property>
-                <property name="text" translatable="yes">Progress</property>
-              </object>
-              <packing>
-                <property name="expand">False</property>
-                <property name="fill">True</property>
-                <property name="padding">2</property>
-                <property name="position">2</property>
-              </packing>
-            </child>
-            <child>
-              <object class="GtkBox" id="box_brc_playtime">
+              <object class="GtkGrid">
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
                 <child>
-                  <object class="GtkLabel" id="label_brc_playtime">
+                  <object class="GtkLabel" id="label_brc">
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
-                    <property name="margin_left">2</property>
-                    <property name="margin_right">2</property>
                     <property name="margin_top">2</property>
                     <property name="margin_bottom">2</property>
-                    <property name="label" translatable="yes">0:00</property>
+                    <property name="label" translatable="yes">Broadcast List</property>
                     <attributes>
                       <attribute name="font-desc" value="Sans Bold 14"/>
                     </attributes>
                   </object>
                   <packing>
-                    <property name="expand">True</property>
-                    <property name="fill">True</property>
-                    <property name="padding">2</property>
-                    <property name="position">0</property>
+                    <property name="left_attach">0</property>
+                    <property name="top_attach">0</property>
+                    <property name="width">3</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel" id="label_air">
+                    <property name="visible">True</property>
+                    <property name="can_focus">False</property>
+                    <property name="margin_top">10</property>
+                    <property name="margin_bottom">10</property>
+                    <property name="label" translatable="yes">Off Air</property>
+                    <attributes>
+                      <attribute name="font-desc" value="Sans Bold 16"/>
+                    </attributes>
+                  </object>
+                  <packing>
+                    <property name="left_attach">0</property>
+                    <property name="top_attach">1</property>
+                    <property name="width">3</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkProgressBar" id="progress_brc">
+                    <property name="height_request">30</property>
+                    <property name="visible">True</property>
+                    <property name="can_focus">False</property>
+                    <property name="margin_top">2</property>
+                    <property name="margin_bottom">2</property>
+                    <property name="text" translatable="yes">Progress</property>
+                  </object>
+                  <packing>
+                    <property name="left_attach">0</property>
+                    <property name="top_attach">2</property>
+                    <property name="width">3</property>
                   </packing>
                 </child>
                 <child>
                   <object class="GtkButton" id="button_brc_skip">
-                    <property name="label" translatable="yes">Skip to End</property>
+                    <property name="label" translatable="yes">Skip</property>
                     <property name="visible">True</property>
                     <property name="can_focus">True</property>
                     <property name="receives_default">True</property>
                     <signal name="clicked" handler="on_button_brc_skip_clicked" swapped="no"/>
                   </object>
                   <packing>
-                    <property name="expand">False</property>
-                    <property name="fill">False</property>
-                    <property name="padding">2</property>
-                    <property name="pack_type">end</property>
-                    <property name="position">1</property>
+                    <property name="left_attach">2</property>
+                    <property name="top_attach">3</property>
                   </packing>
                 </child>
-              </object>
-              <packing>
-                <property name="expand">False</property>
-                <property name="fill">False</property>
-                <property name="padding">2</property>
-                <property name="position">3</property>
-              </packing>
-            </child>
-            <child>
-              <object class="GtkBox" id="box_brc_btn">
-                <property name="visible">True</property>
-                <property name="can_focus">False</property>
                 <child>
                   <object class="GtkButton" id="button_info">
                     <property name="label" translatable="yes">Info</property>
@@ -1350,10 +1291,8 @@ Report to
                     <signal name="clicked" handler="on_button_info_clicked" swapped="no"/>
                   </object>
                   <packing>
-                    <property name="expand">False</property>
-                    <property name="fill">False</property>
-                    <property name="padding">2</property>
-                    <property name="position">0</property>
+                    <property name="left_attach">0</property>
+                    <property name="top_attach">4</property>
                   </packing>
                 </child>
                 <child>
@@ -1365,25 +1304,8 @@ Report to
                     <signal name="clicked" handler="on_button_remove_clicked" swapped="no"/>
                   </object>
                   <packing>
-                    <property name="expand">False</property>
-                    <property name="fill">False</property>
-                    <property name="padding">2</property>
-                    <property name="position">1</property>
-                  </packing>
-                </child>
-                <child>
-                  <object class="GtkButton" id="button_msg3">
-                    <property name="label" translatable="yes">Msg_3hr</property>
-                    <property name="visible">True</property>
-                    <property name="can_focus">True</property>
-                    <property name="receives_default">True</property>
-                    <signal name="clicked" handler="on_button_msg3_clicked" swapped="no"/>
-                  </object>
-                  <packing>
-                    <property name="expand">False</property>
-                    <property name="fill">False</property>
-                    <property name="padding">2</property>
-                    <property name="position">2</property>
+                    <property name="left_attach">1</property>
+                    <property name="top_attach">4</property>
                   </packing>
                 </child>
                 <child>
@@ -1395,61 +1317,50 @@ Report to
                     <signal name="clicked" handler="on_button_history_clicked" swapped="no"/>
                   </object>
                   <packing>
-                    <property name="expand">False</property>
-                    <property name="fill">False</property>
-                    <property name="padding">2</property>
-                    <property name="position">3</property>
+                    <property name="left_attach">2</property>
+                    <property name="top_attach">4</property>
                   </packing>
                 </child>
                 <child>
-                  <object class="GtkSpinButton" id="spin_history">
+                  <object class="GtkLabel" id="label_brc_playtime">
                     <property name="visible">True</property>
-                    <property name="can_focus">True</property>
-                    <property name="max_length">2</property>
-                    <property name="width_chars">2</property>
-                    <property name="progress_pulse_step">1</property>
-                    <property name="input_purpose">number</property>
-                    <property name="adjustment">adjustment_brc</property>
-                    <property name="snap_to_ticks">True</property>
-                    <property name="numeric">True</property>
+                    <property name="can_focus">False</property>
+                    <property name="margin_top">2</property>
+                    <property name="margin_bottom">2</property>
+                    <property name="label" translatable="yes">0:00</property>
+                    <attributes>
+                      <attribute name="font-desc" value="Sans Bold 14"/>
+                    </attributes>
                   </object>
                   <packing>
-                    <property name="expand">False</property>
-                    <property name="fill">False</property>
-                    <property name="padding">2</property>
-                    <property name="position">4</property>
+                    <property name="left_attach">0</property>
+                    <property name="top_attach">3</property>
+                    <property name="width">2</property>
                   </packing>
                 </child>
               </object>
               <packing>
                 <property name="expand">False</property>
                 <property name="fill">True</property>
-                <property name="padding">2</property>
-                <property name="position">4</property>
+                <property name="position">0</property>
               </packing>
             </child>
             <child>
               <object class="GtkScrolledWindow" id="scr_brc">
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
+                <property name="hscrollbar_policy">never</property>
                 <property name="shadow_type">in</property>
                 <child>
-                  <object class="GtkViewport" id="viewport_brc">
+                  <object class="GtkTreeView" id="treeview_brc">
                     <property name="visible">True</property>
-                    <property name="can_focus">False</property>
-                    <child>
-                      <object class="GtkTreeView" id="treeview_brc">
-                        <property name="visible">True</property>
-                        <property name="can_focus">True</property>
-                        <property name="margin_left">2</property>
-                        <property name="margin_right">2</property>
-                        <property name="margin_top">6</property>
-                        <property name="margin_bottom">6</property>
-                        <property name="model">liststore_brc</property>
-                        <child internal-child="selection">
-                          <object class="GtkTreeSelection"/>
-                        </child>
-                      </object>
+                    <property name="can_focus">True</property>
+                    <property name="margin_top">6</property>
+                    <property name="margin_bottom">6</property>
+                    <property name="model">liststore_brc</property>
+                    <property name="search_column">0</property>
+                    <child internal-child="selection">
+                      <object class="GtkTreeSelection"/>
                     </child>
                   </object>
                 </child>
@@ -1457,7 +1368,7 @@ Report to
               <packing>
                 <property name="expand">True</property>
                 <property name="fill">True</property>
-                <property name="position">5</property>
+                <property name="position">1</property>
               </packing>
             </child>
             <child>
@@ -1465,8 +1376,6 @@ Report to
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
                 <property name="halign">end</property>
-                <property name="margin_left">2</property>
-                <property name="margin_right">2</property>
                 <property name="margin_top">2</property>
                 <property name="margin_bottom">2</property>
                 <property name="hexpand">True</property>
@@ -1476,7 +1385,7 @@ Report to
               <packing>
                 <property name="expand">False</property>
                 <property name="fill">True</property>
-                <property name="position">6</property>
+                <property name="position">2</property>
               </packing>
             </child>
           </object>

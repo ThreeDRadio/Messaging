@@ -3,6 +3,7 @@
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib, GdkPixbuf
+import datetime
 
 import queries
 
@@ -26,11 +27,18 @@ class Player(object):
         self.make_buttons()     
         # Messages widgets
         self.liststore_msg = go("liststore_msg")
-        #self.liststore_msg = Gtk.ListStore(str, str, str, str)
         self.treeview_msg = go('treeview_msg')
         self.create_msg_columns()   
         self.displayed_messages = []
+        
+        # Schedule widgets
+        self.liststore_sch = go("liststore_sch")
+        self.treeview_sch = go('treeview_sch')
+        self.create_sch_columns()   
+        self.show_schedule()
+        
         self.window.show_all()
+        
         
     def make_buttons(self):
         '''
@@ -40,8 +48,7 @@ class Player(object):
         if ls_btn:
             for item in ls_btn:
                 self.box_msgtype.remove(item)
-        
-        
+                
         type_rows = query.get_types()
 
         for msg_type in type_rows:
@@ -146,7 +153,7 @@ class Player(object):
         column = Gtk.TreeViewColumn('Code', Gtk.CellRendererText(),
                                     text=0)
         column.set_sort_column_id(0)
-        column.set_clickable(False)
+        column.set_clickable(True)
         column.set_sizing(Gtk.TreeViewColumnSizing.AUTOSIZE)
         self.treeview_msg.append_column(column)
         
@@ -154,8 +161,8 @@ class Player(object):
         column = Gtk.TreeViewColumn('Message', Gtk.CellRendererText(),
                                     text=1)
         column.set_sort_column_id(1)
-        column.set_clickable(False)
-        column.set_sizing(Gtk.TreeViewColumnSizing.AUTOSIZE)
+        column.set_clickable(True)
+        column.set_expand(True)
         self.treeview_msg.append_column(column)
         
         #Column TWO
@@ -163,14 +170,14 @@ class Player(object):
                                     text=2)
         column.set_sort_column_id(2)
         column.set_clickable(False)
-        column.set_sizing(Gtk.TreeViewColumnSizing.AUTOSIZE)
+        column.set_expand(True)
         self.treeview_msg.append_column(column)
         
         #Column THREE
         column = Gtk.TreeViewColumn('Time', Gtk.CellRendererText(),
                                     text=3)
         column.set_sort_column_id(3)
-        column.set_clickable(False)
+        column.set_clickable(True)
         column.set_sizing(Gtk.TreeViewColumnSizing.AUTOSIZE)
         self.treeview_msg.append_column(column)
         
@@ -194,9 +201,117 @@ class Player(object):
                 str_duration = "NA"
                 
             row = (code, title, nq, str_duration)
-            print(row)
             self.liststore_msg.append(row)
 
+    #-------- Schedule ----------
+    
+    def create_sch_columns(self):
+        # column ZERO
+        column = Gtk.TreeViewColumn('Time', Gtk.CellRendererText(),
+                                    text=0)
+        column.set_sort_column_id(0)
+        column.set_clickable(False)
+        column.set_expand(False)
+        column.set_sizing(Gtk.TreeViewColumnSizing.AUTOSIZE)
+        self.treeview_sch.append_column(column)
+        
+        #Column ONE
+        column = Gtk.TreeViewColumn('Program', Gtk.CellRendererText(),
+                                    text=1)
+        column.set_sort_column_id(1)
+        column.set_expand(True)
+        column.set_clickable(False)
+        column.set_resizable(True)
+        self.treeview_sch.append_column(column)
+        
+        #Column TWO
+        column = Gtk.TreeViewColumn('ID Code', Gtk.CellRendererText(),
+                                    text=2)
+        column.set_sort_column_id(2)
+        column.set_clickable(False)
+        column.set_expand(False)
+        self.treeview_sch.append_column(column)
+        
+        #Column THREE
+        column = Gtk.TreeViewColumn('Message', Gtk.CellRendererText(),
+                                    text=3)
+        column.set_sort_column_id(3)
+        column.set_resizable(True)
+        column.set_clickable(False)
+        self.treeview_sch.append_column(column)
+        
+        #Column FOUR
+        column = Gtk.TreeViewColumn('Length', Gtk.CellRendererText(),
+                                    text=4)
+        column.set_sort_column_id(4)
+        column.set_clickable(False)
+        column.set_expand(False)
+        column.set_sizing(Gtk.TreeViewColumnSizing.AUTOSIZE)
+        self.treeview_sch.append_column(column)
+        
+        
+    def show_schedule(self):
+        '''
+        get messages of the selected type and display as a list
+        Creates a list of half hour time slots. Adds programmes and 
+        scheduled messages        
+        '''
+        self.liststore_sch.clear()
+        schedule = query.get_schedule()
+        programmes = query.get_programmes()
+        timeslot = datetime.time(6, 0)
+        add = datetime.timedelta(minutes=30)
+        finaltime = datetime.time(5, 30)
+        time_list = [["06:00", "", "", "", ""]]
+
+        while (timeslot != finaltime):
+            timeslot = ((datetime.datetime.combine(datetime.date(1,1,1),timeslot)) + add).time()
+            timestring = timeslot.strftime("%H:%M")
+            row = [timestring,  "", "", "", ""]
+            time_list.append(row)
+        
+        n = 0    
+        for row in time_list:
+            #check if there is a programme starting at that time
+            n+=1
+            m = n
+            starttime = row[0]
+            
+            for prog in programmes:
+                prog_time = (prog['start']).strftime('%H:%M')
+
+                if prog_time==starttime:
+                   row[1] = prog['name']
+            #then check if there are messages scheduled for that time
+         
+            for msg in schedule:                
+                # modify duration                
+                msg_sch_time = (msg['time_date']).strftime('%H:%M')
+                duration = msg['duration'] 
+                
+                if duration:
+                    str_duration = self.convert_time(duration)
+                else:
+                    str_duration = "NA"
+                                
+                if msg_sch_time==starttime:
+                    if row[2] == "":
+                        row[2] = msg['msg_code']
+                        row[3] = msg['title']
+                        row[4] = str_duration      
+
+                    else:
+                        time_list.insert(m, [
+                            "", 
+                            "", 
+                            msg['msg_code'], 
+                            msg['title'], 
+                            msg['duration']
+                            ])
+                m+=1
+        
+        for row in time_list:
+            self.liststore_sch.append(row)    
 
     #common functions
     def convert_time(self, duration):
