@@ -64,7 +64,7 @@
       <column type="gchararray"/>
       <!-- column-name Programme -->
       <column type="gchararray"/>
-      <!-- column-name ID Code -->
+      <!-- column-name ID -->
       <column type="gchararray"/>
       <!-- column-name Message -->
       <column type="gchararray"/>
@@ -164,9 +164,6 @@ Report to
                       </packing>
                     </child>
                   </object>
-                  <packing>
-                    <property name="tab_expand">True</property>
-                  </packing>
                 </child>
                 <child type="tab">
                   <object class="GtkLabel" id="label_msg">
@@ -864,7 +861,7 @@ Report to
                 </child>
               </object>
               <packing>
-                <property name="expand">True</property>
+                <property name="expand">False</property>
                 <property name="fill">True</property>
                 <property name="position">0</property>
               </packing>
