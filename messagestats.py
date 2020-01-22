@@ -336,20 +336,27 @@ class Stats(gtk.Window):
                 )
 
     def save_stats(self, clicked):
-        print("clicked save stats")
         filepath = self.get_filepath()
-        if os.path.isfile(filepath):
+        if not os.path.isfile(filepath):
+            self.write_file(filepath)
+        else:
             response = self.confirm_overwrite(filepath)
-            if response == gtk.RESPONSE_OK:        
-                with open(filepath, 'w') as csvfile:
-                    field_names = ['code', 'scheduled_time', 'played_time', 'computer']
-                    writer = csv.DictWriter(csvfile, fieldnames=field_names)
-                    writer.writeheader()
-                    for dict1 in self.list1:
-                        dict2 = {x:dict1[x] for x in field_names}
-                        writer.writerow(dict2)
+            if response == gtk.RESPONSE_OK:
+                os.remove(filepath)        
+                self.write_file(filepath)
             else:
                 print("cancelled")
+
+                    
+    def write_file(self, filepath):
+        with open(filepath, 'w') as csvfile:
+            field_names = ['code', 'scheduled_time', 'played_time', 'computer']
+            writer = csv.DictWriter(csvfile, fieldnames=field_names)
+            writer.writeheader()
+            for dict1 in self.list1:
+                dict2 = {x:dict1[x] for x in field_names}
+                writer.writerow(dict2)        
+    
 
     def quit_program(self, clicked):
         print("clicked quit")
