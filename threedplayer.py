@@ -1989,6 +1989,8 @@ class ThreeD_Player():
         self.store_pl3d_browse.clear()
         parents = {}
         for top_dir, dirs, files in os.walk(dir_pl3d):
+            dirs.sort()
+            files.sort()
             for subdir in dirs:
                 parents[os.path.join(top_dir, subdir)] = self.store_pl3d_browse.append(parents.get(top_dir, None), [subdir])
             for item in files:
@@ -2194,7 +2196,7 @@ class ThreeD_Player():
         iter = model.get_iter_first()
         if iter:
             self.refresh_list(model)
-            self.update_time_total()
+        self.update_time_total()
         
     def info_row(self, widget):    
         treeselection = self.treeview_bc.get_selection()
