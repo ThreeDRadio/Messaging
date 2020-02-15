@@ -328,9 +328,11 @@ class ChangeMessage():
 
         
     def make_change(self, fields):
-        n = fields["filename"]
+        
         if self.filepath_new:
-            self.replace_file()
+            filename_old = self.filename
+            filepath_new = self.filepath_new
+            self.replace_file(filename_old, filepath_new)
 
         conn = self.messager.pg_connect_msg()
         cur = conn.cursor()
@@ -355,28 +357,52 @@ class ChangeMessage():
             print("the message type listed here is " + msg_type)
             self.change_msg_type(msg_type)
 
-    def replace_file(self):
+    def replace_file(self, filename_old, filepath_new):
+        '''
+        archive the old audio file and copy over the new one.
+        '''
         dt = datetime.datetime.now()
         dir_date = datetime.datetime.strftime(dt, "%Y%m")
+        
+        # the folder where the old audio file will be moved
         path_backup = os.path.join(dir_backup, dir_date)
+        
         type_12 = self.msg_type[0:12]
         type_12 = type_12.lower()
-        filename = os.path.basename(self.filepath_new)
-        path_dest = os.path.join(dir_msg, type_12, filename)
+
+        # the folder in which the audio file is kept
+        audio_location = os.path.join(dir_msg, type_12)
         
-        backed_up = os.path.join(path_backup, filename)
-            
+        # full path of the old audio file
+        audiofile_old = os.path.join(audio_location, filename_old)
+
+        # name of the new audio file
+        filename_new = os.path.basename(filepath_new)
+
+        # destination path for new audio file including name of the file
+        path_dest = os.path.join(dir_msg, type_12, filename_new)
+
+        # full destination path for the old audio file including name of the file
+        backed_up = os.path.join(path_backup, filename_old)
+
+        # does the backup folder exist? If not, create
         if not os.path.isdir(path_backup):
             os.mkdir(path_backup)
-            shutil.move(filepath, path_backup)
-        elif os.path.exists(backed_up):
+        
+        # is there already a backup of the old audio file name?
+        # if so, add timestamp to old filename
+        if os.path.exists(backed_up):
             now = datetime.datetime.strftime(dt, "%y%m%d%H%M")
-            filenow = filename + now
-            pathnow = os.path.join(path_backup, filenow)
-            shutil.move(backed_up, filenow)
-            shutil.copyfile(self.filepath_new, path_dest)
-        else:
-            shutil.copyfile(self.filepath_new, path_dest)
+            filenow = filename_old + now
+            backed_up = os.path.join(path_backup, filenow)
+        
+        # move the old file if it exists
+        if os.path.exists(audiofile_old):
+            shutil.move(audiofile_old, backed_up)
+            
+        # copy the new file over
+        shutil.copyfile(filepath_new, path_dest)
+        
     
     def change_msg_type(self, msg_type):
         # create the new path from the msg_type
