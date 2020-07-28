@@ -2464,7 +2464,10 @@ class ThreeD_Player():
 
     def date_and_time(self):
         self.label_date.set_text(time.strftime(("%A %d %B")))
+        # uncomment below to show hours and minutes
         self.label_time.set_text(time.strftime('%H:%M %p'))
+        # Uncoment below to also display seconds
+        # self.label_time.set_text(time.strftime('%-I:%M:%S %p'))
         gtk.timeout_add(1000, self.date_and_time)
 
     def get_top_track(self):
