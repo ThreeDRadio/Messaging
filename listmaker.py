@@ -2,7 +2,7 @@
 '''
 listmaker
 search for tracks and add them to a list which can be saved
-as an xxpf file
+as an xspf file
 '''
 import datetime
 import pickle
@@ -21,6 +21,7 @@ import psycopg2.extras
 import gst
 import pygst
 from lxml import etree
+from psycopg2 import sql
 
 #get variables from config file
 config = ConfigParser.SafeConfigParser()
@@ -41,9 +42,8 @@ pg_cat_database = config.get('Common', 'pg_cat_database')
 #other variables
 sfx = ".p3d"
 sfx_old = ".pl3d"
-
         
-#lists 
+#lists and dictionaries 
 select_items = (
     "cd.title",
     "cd.artist",
@@ -55,24 +55,24 @@ select_items = (
     "cd.female",
     "cd.createwho",
     "cd.createwhen",
-    "cd.comment" ,
+    "cd.genre",
+    "cd.cpa",
     "cdtrack.trackid",
     "cdtrack.cdid",
     "cdtrack.tracknum",
     "cdtrack.tracktitle",
     "cdtrack.trackartist",
     "cdtrack.tracklength",
-
-    "cdcomment.comment  AS cdcomment"
+    "cdcomment.comment"
     )
 
-where_items = (
-    "trackartist",
-    "tracktitle",
-    "cd.title",
-    "cd.artist"
-    )
 
+order_results = {
+            "Newest Albums First": (("year", "DESC"), ("id", "DESC")),
+            "Oldest Albums First": (("year", "ASC"), ("id", "ASC")),
+            "Artist Alphabetical": (("artist", "ASC"), ("id", "DESC")),
+            "Album Alphabetical": (("title", "ASC"), ("id", "DESC"))
+}
 
 class Preview_Player:
     '''
@@ -226,6 +226,9 @@ class List_Maker():
         gtk.main_quit()
 
     def main(self):
+        '''defines the layout of the graphical interface
+           and the events connected to the widgets
+        '''
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL) 
         self.window.set_position(gtk.WIN_POS_CENTER)
         filepath_logo = dir_img + logo
@@ -243,7 +246,7 @@ class List_Maker():
         # vbox for catalogue search
         vbox_cat_search = gtk.VBox(False, 5)
         # table for music catalogue search
-        table_cat = gtk.Table(20, 2, False)
+        table_cat = gtk.Table(21, 2, False)
         # hbox for catalogue creator selection
         hbox_cat_creator = gtk.HBox(False, 5)
         # hbox for catalogue order selection
@@ -254,7 +257,7 @@ class List_Maker():
         # scrolled window for catalogue list treeview
         sw_cat_lst = gtk.ScrolledWindow()
         sw_cat_lst.set_shadow_type(gtk.SHADOW_ETCHED_IN)
-        sw_cat_lst.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC) 
+        sw_cat_lst.set_policy(gtk.POLICY_NEVER, gtk.POLICY_AUTOMATIC) 
         
         # hbox for preview player buttons
         hbox_pre_btn = gtk.HBox(False, 0)  
@@ -267,7 +270,7 @@ class List_Maker():
         # scrolled holder for the playlist treelist
         sw_pl = gtk.ScrolledWindow()
         sw_pl.set_shadow_type(gtk.SHADOW_ETCHED_IN)
-        sw_pl.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        sw_pl.set_policy(gtk.POLICY_NEVER, gtk.POLICY_AUTOMATIC)
  
         # hbox for Total Time 
         hbox_pl_time = gtk.HBox(False, 0)    
@@ -287,7 +290,16 @@ class List_Maker():
         label_search = gtk.Label(" Music Catalogue ")
         label_search.modify_font(header_font)        
         sep_cat_0 = gtk.HSeparator()
-        label_search = gtk.Label("Search for Songs")
+        label_cat_simple = gtk.Label("Simple Search")
+        label_cat_simple.modify_font(subheader_font_1)
+        self.entry_cat_simple = gtk.Entry(50)
+        btn_cat_simple = gtk.Button("Search")
+        btn_cat_simple.set_tooltip_text("Simple search")
+        btn_cat_simple.set_size_request(80, 30)
+        self.label_result_simple = gtk.Label()
+        self.label_result_simple.set_size_request(80, 40)
+        sep_cat_1 = gtk.HSeparator()
+        label_search = gtk.Label("Advanced Search")
         label_search.modify_font(subheader_font_1)
         label_search_artist = gtk.Label("Artist")
         self.entry_search_artist = gtk.Entry(50)
@@ -301,13 +313,26 @@ class List_Maker():
         self.entry_search_genre = gtk.Entry(50)        
         label_search_com = gtk.Label("Comments")
         self.entry_search_com = gtk.Entry(50)
-        label_search_creator = gtk.Label("Created by")
+        label_search_cpa = gtk.Label("Source")
+        self.entry_search_cpa = gtk.Entry(50)
+        label_search_year = gtk.Label("Release year")
+        self.entry_search_year = gtk.Entry(4)
+        label_search_creator = gtk.Label("Added by")
         self.cb_search_creator = gtk.combo_box_new_text()
-        self.cb_creator_add()       
+        style = gtk.rc_parse_string('''
+            style "my-style" { GtkComboBox::appears-as-list = 1 }
+            widget "*.mycombo" style "my-style"
+        ''')
+        self.cb_search_creator.set_name('mycombo')
+        self.cb_search_creator.set_style(style)
+        self.dict_creator = self.get_dict_creator()
+        self.cb_creator_add(self.dict_creator)        
         self.chk_search_comp = gtk.CheckButton("Compilation", True)
         self.chk_search_demo = gtk.CheckButton("Demo", True)
         self.chk_search_local = gtk.CheckButton("Local", True)       
         self.chk_search_fem = gtk.CheckButton("Female", True)
+        self.chk_search_nr = gtk.CheckButton("New Entries", True)
+        
         label_search_order = gtk.Label("Order by")
         self.cb_search_order = gtk.combo_box_new_text()
         self.cb_order_add()
@@ -417,7 +442,9 @@ class List_Maker():
         self.entry_search_track.connect("activate", self.search_catalogue)
         self.entry_search_cmpy.connect("activate", self.search_catalogue)
         self.entry_search_genre.connect("activate", self.search_catalogue)
-        self.entry_search_com.connect("activate", self.search_catalogue)       
+        self.entry_search_com.connect("activate", self.search_catalogue)
+        self.entry_search_cpa.connect("activate", self.search_catalogue)
+        self.entry_search_year.connect("activate", self.search_catalogue)           
         btn_search.connect("clicked", self.search_catalogue)
         self.btn_pre_play_pause.connect("clicked", self.play_pause_clicked)
         btn_pre_stop.connect("clicked", self.on_stop_clicked)
@@ -449,7 +476,10 @@ class List_Maker():
         table_cat.attach(self.entry_search_com, 1, 2, 4, 5, False, False, 5, 0)
         table_cat.attach(label_search_genre, 0, 1, 5, 6, False, False, 5, 0)
         table_cat.attach(self.entry_search_genre, 1, 2, 5, 6, False, False, 5, 0)
-        
+        table_cat.attach(label_search_cpa, 0, 1, 6, 7, False, False, 5, 0)
+        table_cat.attach(self.entry_search_cpa, 1, 2, 6, 7, False, False, 5, 0)
+        table_cat.attach(label_search_year, 0, 1, 7, 8,  False, False, 5, 0)
+        table_cat.attach(self.entry_search_year, 1, 2, 7, 8,  False, False, 5, 0)        
         
         hbox_cat_creator.pack_start(label_search_creator, False)
         hbox_cat_creator.pack_start(self.cb_search_creator, False)
@@ -472,6 +502,7 @@ class List_Maker():
         vbox_cat_search.pack_start(self.chk_search_demo, False)
         vbox_cat_search.pack_start(self.chk_search_local, False)
         vbox_cat_search.pack_start(self.chk_search_fem, False)
+        vbox_cat_search.pack_start(self.chk_search_nr, False)
         vbox_cat_search.pack_start(hbox_cat_order, False)   
         vbox_cat_search.pack_start(btn_search, False)
         #vbox_cat_search.pack_start(self.entry_search_adv, False)  
@@ -515,7 +546,10 @@ class List_Maker():
 
     # columns for the lists
     def add_cat_columns(self, treeview):
-        
+        '''
+        Columns for the list of search results. The first column is hidden 
+        and contains all the information about the track/CD in that row
+        '''        
         #Column ONE
         column = gtk.TreeViewColumn('Dict', gtk.CellRendererText(),
                                     text=0)
@@ -524,20 +558,20 @@ class List_Maker():
         treeview.append_column(column)
                 
         #Column TWO
-        column = gtk.TreeViewColumn('Album / Title', gtk.CellRendererText(),
+        column = gtk.TreeViewColumn('Album / Artist', gtk.CellRendererText(),
                                     text=1)
         column.set_sort_column_id(1)
-        #column.set_resizable(True)
+        column.set_resizable(True)
         column.set_sizing(gtk.TREE_VIEW_COLUMN_FIXED)
         column.set_fixed_width(240)
         treeview.append_column(column)
        
         #Column THREE
-        column = gtk.TreeViewColumn('Artist', gtk.CellRendererText(),
+        column = gtk.TreeViewColumn('Title', gtk.CellRendererText(),
                                     text=2)
         column.set_sort_column_id(2)
         column.set_clickable(False)
-        #column.set_resizable(True)
+        column.set_resizable(True)
         column.set_sizing(gtk.TREE_VIEW_COLUMN_FIXED)
         column.set_fixed_width(240)
         treeview.append_column(column)
@@ -551,6 +585,10 @@ class List_Maker():
         treeview.append_column(column)
         
     def add_pl_columns(self, treeview):
+        '''
+        Columns for the playlist of tracks. The first column is hidden 
+        and contains all the information about the track in that row
+        '''
         # Column ONE
         column = gtk.TreeViewColumn('Dict', gtk.CellRendererText(),
                                     text=0)
@@ -584,6 +622,10 @@ class List_Maker():
     # dnd    
     def cat_drag_data_get_data(self, treeview, context, selection, target_id,
                            etime):
+        '''
+        copy the details from the hidden column of the selected row
+        for drag n drop from the search results list.
+        '''
         treeselection = treeview.get_selection()
         model, iter = treeselection.get_selected()
         
@@ -599,6 +641,10 @@ class List_Maker():
 
     def pl_drag_data_get_data(self, treeview, context, selection, target_id,
                            etime):
+        '''
+        copy the details from the hidden column of the selected row
+        for drag n drop within the playlist.
+        '''                                                           
         treeselection = treeview.get_selection()
         model, iter = treeselection.get_selected()
         
@@ -611,6 +657,9 @@ class List_Maker():
         
     def drag_data_received_data(self, treeview, context, x, y, selection,
                                 info, etime):
+        '''
+        add or move a row in the playlist using details copied with drag n drop.
+        '''
         model = treeview.get_model()
         pickle_data = selection.get_text()
         if not pickle_data:
@@ -624,27 +673,27 @@ class List_Maker():
         tracktime = self.convert_time(int_time)
         #cd_code = str(format(item[2], '07d'))
         #track_no = str(format(item[3], '02d'))
-        cd_code = str(format(dict_data['cdid'], '07d'))
-        track_no = str(format(dict_data['tracknum'], '02d'))
+        cd_code = str(format(dict_data['cdid'], '07d')) # 7 digit
+        track_no = str(format(dict_data['tracknum'], '02d')) # 2 digit
         tracktitle = dict_data['tracktitle']
         trackartist = dict_data['trackartist']
         artist = dict_data['artist']
         if not trackartist:
             trackartist = artist
-            
+        
+        tracktitle = trackartist + '\n' + tracktitle
         list_data = (pickle_data, tracktitle, trackartist, tracktime)
 
         ID = cd_code + "-" + track_no
         if ID and  int_time:
             filepath = self.get_filepath(ID)
             #remove the check for testing where there are no files
-            #print(filepath)
-            #if not filepath:
-            #    str_error = "Unable to add to the list, file does not exist. That track has probably not yet been ripped into the music store"
-            #    self.error_dialog(str_error) 
-            
-            #else:
+            print(filepath)
             if not filepath:
+                str_error = "Unable to add to the list, file does not exist. That track has probably not yet been ripped into the music store"
+                self.error_dialog(str_error) 
+            
+            else:
                 drop_info = treeview.get_dest_row_at_pos(x, y)
                 if drop_info:
                     path, position = drop_info
@@ -675,6 +724,9 @@ class List_Maker():
 
     # music catalogue section       
     def pg_connect_cat(self):
+        '''
+        initiate a connection to the catalogue database
+        '''
         conn_string = 'dbname={0} user={1} host={2} password={3}'.format (
                 pg_cat_database, pg_user, pg_server, pg_password)
         conn = psycopg2.connect(conn_string)
@@ -682,6 +734,12 @@ class List_Maker():
 
     
     def length_check(self, result):
+        '''
+        check if the number of results returned is equal to 
+        the value set as the limit for returned results.
+        Display a message if the number is equal
+        '''
+
         if len(result) == query_limit:
             str_warn_0 = "Warning - your query returned "
             str_warn_1 = " or more results. Only displaying the first "
@@ -691,10 +749,31 @@ class List_Maker():
 
     
     def add_to_cat_store(self, result):
+        '''
+        take the results of the search and display as rows in a treeview list
+        full search details for each item go into the hidden column 
+        '''
+
+        # remove extra results caused by multiple comments.
+        mod_result = []
+        first = True
+        separator = '''
+        -----------------------
+        '''
+        for item in result:
+            if first:
+                mod_result.append(item)
+                first = False
+            else:
+                if item["trackid"] == mod_result[-1]["trackid"]:
+                    mod_result[-1]["comment"] = mod_result[-1]["comment"] + separator + item["comment"]
+                else:
+                    mod_result.append(item)
 
         self.clear_cat_list()
         var_album = ""
-        for item in result:
+        
+        for item in mod_result:
             model = self.treeview_cat.get_model()
             item_dict = {}
             
@@ -724,19 +803,31 @@ class List_Maker():
             int_time = item['tracklength']
             int_time = int(int_time)
             dur_time = self.convert_time(int_time)
+            artist_album = artist + '\n' + album
             
             if not album:
                 album = "(No Title)"
 
-            #print (album, trackartist, dur_time)
+            if not album == var_album:                
+                n = model.append(None, [pickle_list, artist_album, "", ""])
+                model.append(n, [pickle_list, trackartist, title, dur_time])
+            else:
+                model.append(n, [pickle_list, trackartist, title, dur_time])
+            var_album = album
+
+            '''
             if not album == var_album:                
                 n = model.append(None, [pickle_list, album, artist, ""])
                 model.append(n, [pickle_list, title, trackartist, dur_time])
             else:
                 model.append(n, [pickle_list, title, trackartist, dur_time])
             var_album = album
-
+            '''
+            
     def search_catalogue(self, widget):
+        '''
+        run functions which query the database and display the results as a list
+        '''
         result = self.query_catalogue()
         if result:
             self.length_check(result)
@@ -751,224 +842,325 @@ class List_Maker():
 
     
     def query_catalogue(self):
+        '''
+        Make a query to the catalogue database based on the user input. 
+        Return the results.
+        '''
         #obtain text from entries and combos and add to parameter dictionary
-        parameters = {}
+        search_terms = {}
         
         artist = self.entry_search_artist.get_text()
         if artist:
             artist = self.add_percent(artist)
-            parameters['artist'] = artist
-            q_artist = "(cd.artist ILIKE %(artist)s OR cdtrack.trackartist ILIKE %(artist)s) AND "
-        else:
-            q_artist = None
+            search_terms["cd.artist"] = artist
             
         album = self.entry_search_album.get_text()
         if album:
             album = self.add_percent(album)
-            parameters['album'] = album
-            q_album = "cd.title ILIKE %(album)s AND "
-        else:
-            q_album = None
+            search_terms["cd.title"] = album
             
         track = self.entry_search_track.get_text()
         if track:
             track = self.add_percent(track)
-            parameters['track'] = track
-            q_track = "cdtrack.tracktitle ILIKE %(track)s AND "
-        else:
-            q_track = None            
+            search_terms["cdtrack.tracktitle"] = track
             
         company = self.entry_search_cmpy.get_text()
         if company:
             company = self.add_percent(company)
-            parameters['company'] = company
-            q_company = "cd.company ILIKE %(company)s AND "
-        else:
-            q_company = None
+            search_terms["cd.company"] = company
                         
         comments = self.entry_search_com.get_text()
         if comments:
             comments = self.add_percent(comments)
-            parameters['comments'] = comments
-            q_comments = "cdcomment.comment ILIKE %(comments)s AND "
-        else:
-            q_comments = None
+            search_terms["cdcomment.comment"] = comments
                                 
         genre = self.entry_search_genre.get_text()
         if genre:
             genre = self.add_percent(genre)
-            parameters['genre'] = genre
-            q_genre = "cd.genre ILIKE %(genre)s AND "
-        else:
-            q_genre = None
+            search_terms["cd.genre"] = genre
+            
+        cpa = self.entry_search_cpa.get_text()
+        if cpa:
+            cpa = self.add_percent(cpa)
+            search_terms["cd.cpa"] = cpa
+            
+        year = self.entry_search_year.get_text()
+        if year:
+            try:                        
+                year = int(year)
+                search_terms["cd.year"] = year
+            except ValueError:
+                str_error = '''
+                Not a valid year
+                '''
+                self.error_dialog(str_error)
+                
                         
-        created_by = self.cb_search_creator.get_active_text()
-        if created_by:
-            ls_creator = created_by.split(',')
-            created_by = ls_creator[0]
-            parameters['created_by'] = created_by
-            q_created_by = "cd.createwho = %(created_by)s AND "
-        else:
-            q_created_by = None
+        creator = self.cb_search_creator.get_active_text()
+        if creator:
+            # let's hope for the interim that we do not get
+            # two  members who have the same name ...
+            for id in self.dict_creator.keys():
+                if self.dict_creator[id] == creator:
+                    created_by = id 
+            search_terms["cd.createwho"] = created_by
                         
         compil = self.chk_search_comp.get_active()
         if compil:
-            parameters['compil'] = compil
-            q_compil = "cd.compilation = 2 AND "
-        else:
-            q_compil = None
+            search_terms["cd.compilation"] = 2
                         
         demo = self.chk_search_demo .get_active()
         if demo:
-            parameters['demo'] = demo
-            q_demo = "cd.demo = 2 AND "
-        else:
-            q_demo = None
+            search_terms["cd.demo"] = 2
 
         local = self.chk_search_local.get_active()
         if local:
-            parameters['local'] = local
-            q_local = "cd.local = 2 AND "
-        else:
-            q_local = None
+            search_terms["cd.local"] = 2
 
         female = self.chk_search_fem.get_active()
         if female:
-            parameters['female'] = female
-            q_female = "cd.female = 2 AND "
-        else:
-            q_female = None
-        
+            search_terms["cd.female"] = 2
+            
+        new_release = self.chk_search_nr.get_active()
+        if new_release:
+            today = datetime.date.today()
+            nr_delta = datetime.timedelta(days=60)
+            nr = today - nr_delta
+            search_terms["cd.arrivaldate"] = nr 
+
+            
 
         #query according to the text
         
-        str_error_none = "No search terms were entered"
+        str_error_none = "I can't see what you are searching for"
         str_error_len = "Please enter more than one character in your search"
         
-        if not artist and not album and not track and not company and not comments and not genre:
+        if not (artist or album or track or company or comments or creator or genre or new_release or year or cpa):
             self.error_dialog(str_error_none)
             return False
+        
+        '''
+        # comment this out for now.
             
         for item in (artist, album, track, company, comments, genre):
             if item:
                 if len(item) < 2:
                     self.error_dialog(str_error_len)
                     return False
-                    
+        '''            
 
-        str_select = "SELECT "
-        for s in select_items:    
-            str_select = str_select + s + ", "        
-        str_select = str_select.rstrip(", ")
-        str_from = " FROM cdtrack INNER JOIN cd ON cdtrack.cdid=cd.id LEFT JOIN cdcomment on cd.id=cdcomment.cdid "
-        str_where = "WHERE "
         
-        q_var = (
-            q_artist,
-            q_album,
-            q_track,
-            q_company,
-            q_comments,
-            q_genre,
-            q_created_by,
-            q_compil,
-            q_demo,
-            q_local,
-            q_female,
+        select_statement = sql.SQL("SELECT")
+        
+        for i, item in enumerate(select_items):
+            table, column = item.split(".")
+            table = sql.Identifier(table)
+            column = sql.Identifier(column)
+            identifier = sql.SQL("{}.{}").format(table, column)
+            if i == 0:
+                select_statement = sql.SQL(' ').join([select_statement, identifier])
+            else:
+                select_statement = sql.SQL(', ').join([select_statement, identifier])
+        
+        from_statement = sql.SQL("FROM {} INNER JOIN {} ON {}.{}={}.{} LEFT OUTER JOIN {} ON {}.{}={}.{}").format(
+        sql.Identifier("cdtrack"),
+        sql.Identifier("cd"),
+        sql.Identifier("cdtrack"),
+        sql.Identifier("cdid"),
+        sql.Identifier("cd"),
+        sql.Identifier("id"),
+        sql.Identifier("cdcomment"),
+        sql.Identifier("cdtrack"),
+        sql.Identifier("cdid"),
+        sql.Identifier("cdcomment"),
+        sql.Identifier("cdid"),
+        )
+
+        where_statement = sql.SQL("WHERE")
+        for i, item in enumerate(search_terms):
+            table, column = item.split(".")
+            table = sql.Identifier(table)
+            column = sql.Identifier(column)
+            placeholder = sql.Placeholder(name = item)
+            value = search_terms[item]
+            
+            if i > 0:
+                and_statement = sql.SQL("AND")
+                where_statement = sql.SQL(' ').join([where_statement, and_statement])
+            if item == "cd.artist":
+                artist_search = sql.SQL("({}.{} ILIKE {} ESCAPE '' OR {}.{} ILIKE {} ESCAPE '')").format(
+                    table,
+                    column,
+                    placeholder,
+                    sql.Identifier("cdtrack"),
+                    sql.Identifier("trackartist"),
+                    placeholder
+                    )
+                where_statement = sql.SQL(' ').join([where_statement, artist_search])
+            
+            elif isinstance(value, str):
+                ilike_search = sql.SQL("{}.{} ILIKE {} ESCAPE ''").format(table, column, placeholder)
+                where_statement = sql.SQL(' ').join([where_statement, ilike_search])
+            elif item == "cd.arrivaldate":
+                ge_search = sql.SQL("{}.{} >= {}").format(table, column, placeholder)
+                where_statement = sql.SQL(' ').join([where_statement, ge_search])
+            else:
+                eq_search = sql.SQL("{}.{} = {}").format(table, column, placeholder)
+                where_statement = sql.SQL(' ').join([where_statement, eq_search])
+
+        order_statement = sql.SQL("ORDER BY")
+        order_sql_list = []
+        order_by_text = self.cb_search_order.get_active_text()
+        ordering_items = order_results[order_by_text]
+        for item in ordering_items:
+            table, direction = item
+            if direction == "DESC":
+                order_sql = sql.SQL("{}.{} DESC").format(
+                sql.Identifier("cd"),
+                sql.Identifier(table)
+                )
+            elif direction == "ASC":
+                order_sql = sql.SQL("{}.{} ASC").format(
+                sql.Identifier("cd"),
+                sql.Identifier(table)
+                )
+            order_sql_list.append(order_sql)
+        order_sql = sql.SQL("{}.{}").format(
+            sql.Identifier("cdtrack"),
+            sql.Identifier("tracknum")
             )
-            
-        for item in q_var:
-            if item:
-                str_where = str_where + item
-      
-        str_where = str_where.rstrip("AND ")
+        order_sql_list.append(order_sql)
+        order_sql = sql.SQL(", ").join(order_sql_list)
+        order_statement = sql.SQL(" ").join([order_statement, order_sql])
         
-        order_by = self.cb_search_order.get_active()
-        if order_by == 0:
-            order_by = "cd.year DESC, "
-        
-        elif order_by == 1:
-            order_by = "cd.year, "
-        
-        elif order_by ==2:
-            order_by = "cdtrack.trackartist, cd.artist, "
-            
-        elif order_by == 3:
-            order_by = "cd.title, "
+        limit_statement = sql.SQL("LIMIT {}").format(
+            sql.Literal(query_limit)
+        )
 
-        
-        str_order = " ORDER BY " + order_by + "cd.title , cdtrack.tracknum "
-        str_limit = "LIMIT " + str(query_limit)
-
-        query = str_select + str_from + str_where + str_order + str_limit        
-
+        query = sql.SQL(' ').join([select_statement, from_statement, where_statement, order_statement, limit_statement])
+   
         conn = self.pg_connect_cat()
-        dict_cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        
+        # show the query for debugging
+        #query_string = query.as_string(conn)
+        #print(query_string)
 
-        dict_cur.execute(query, parameters)
+        dict_cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        dict_cur.execute(query, (search_terms))
         result = dict_cur.fetchall()
         
         dict_cur.close()
-        conn.close()   
+        conn.close()  
         
+
+        # convert the results to a true dictionary - for testing purposes
+        #row_dict = [{k:v for k, v in record.items()} for record in result]
+        #print(row_dict)
+        result = [{k:v for k, v in record.items()} for record in result]
         return result
 
     def add_percent(self, parameter):
+        '''
+        wrap the string with percentage signs for 'ILIKE' query, avoiding 
+        conflict with the symbol for substitution when defining parameters
+        '''
         l = ('%', parameter, '%')
         percented = ''.join(l)
         return percented
+        
+    def get_dict_creator(self):
+        '''
+        create a dictionary of music catalogue user IDs and names
+        '''
+        list_creator = self.get_creator()
+        dict_creator = {}
+        for creator in list_creator:
+            num = int(creator[0])
+            first = creator[1].lower()
+            second = creator[2].lower()
+            fullname = first + " " + second
+
+            dict_creator[num] = fullname
+
+        return(dict_creator)
 
     def get_creator(self):
-        query = "SELECT DISTINCT cd.createwho, users.first, users.last FROM cd JOIN users ON cd.createwho = users.id ORDER BY users.last"
+        '''
+        query the catalogue for all users        
+        '''
+        query = "SELECT DISTINCT cd.createwho, users.first, users.last FROM cd JOIN users ON cd.createwho = users.id ORDER BY users.first"
         conn = self.pg_connect_cat()
-        dict_cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-        dict_cur.execute(query)
-        list_creator = dict_cur.fetchall()
-        dict_cur.close()
+        cur = conn.cursor()
+        #dict_cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        cur.execute(query)
+        list_creator = cur.fetchall()
+        cur.close()
         conn.close()
         return list_creator
 
-    def cb_creator_add(self):
+    def cb_creator_add(self, dict_creator):
+        '''
+        populate the drop down list of contributors
+        '''
         liststore_creator = gtk.ListStore(str)        
-        list_creator = self.get_creator()
-        for item in list_creator:
-            str_creator = str(item[0]) + ", " + item[1] + " " + item[2]
-            self.cb_search_creator.append_text(str_creator)
-        self.cb_search_creator.prepend_text("")
+        list_creator = sorted(dict_creator.values())
+        
 
+        for creator in list_creator:
+            self.cb_search_creator.append_text(creator)
+        self.cb_search_creator.prepend_text("")
+        self.cb_search_creator.append_text("")
+
+
+        '''
+        an orphaned function?
+        ...will delete after checking
+                
     def get_order(self):
-      model = self.cb_search_order.get_model()
-      active = self.cb_search_order.get_active()
-      if active < 0:
-          return None
-      return model[active][0]
+        
+        model = self.cb_search_order.get_model()
+        active = self.cb_search_order.get_active()
+        if active < 0:
+            return None
+        return model[active][0]
+        '''
 
     def cb_order_add(self):
-        list_order = ["Newest Songs First",
-            "Oldest Songs First", 
-            "Artist Alphabetical",
-            "Album Alphabetical",
-]
+        '''
+        populate the drop down list for selecting the order to list 
+        search results 
+        '''
+        list_order = order_results.keys()
+        list_order.sort()
         for item in list_order:
             self.cb_search_order.append_text(item)
         self.cb_search_order.set_active(0)
 
     def clear_cat_list(self):
+        '''
+        clear the search results
+        '''
         model = self.treeview_cat.get_model()
         model.clear()
 
 
     def update_result_label(self, int_res):
-        if int_res < 200 :
-            str_results = "Your search returned {0} results".format(int_res)
-            self.label_search_result.set_text(str_results)
-
-        else:
-            self.label_search_result.set_text("")
+        '''
+        Show how many tracks were found in the search
+        '''
+        if int_res >= query_limit :
+            int_res = str(query_limit) + "+"
+        str_results = "Your search returned {0} results".format(int_res)
+        self.label_search_result.set_text(str_results)
 
 
     # preview section  
     def get_sel_filepath(self):
+        '''
+        get the filepath of the track selected in the search results. 
+        Combine the cdid with the track number to get the name of the file
+        then call the function to get the full path 
+        '''
         treeselection = self.treeview_cat.get_selection()
         model, iter = treeselection.get_selected()
         pickle_list = model.get(iter, 0)
@@ -977,14 +1169,12 @@ class List_Maker():
         ID = data_list['cdid']
         tracknum = data_list['tracknum']
         ID = str(ID).zfill(7) + "-" + str(tracknum).zfill(2)
-        print(ID)
         filepath = self.get_filepath(ID)
         if not filepath:
             str_error = "Unable to play, file does not exist. That track has probably not yet been ripped into the music store"
             self.error_dialog(str_error)
             return
         else: 
-            print("Filepath is: " + filepath)
             return filepath
 
     def play_pause_clicked(self, widget):
@@ -1138,7 +1328,6 @@ class List_Maker():
             ls_tracklist.append(dict_row)
             iter = model.iter_next(iter)
 
-
         return ls_tracklist
             
     def open_dialog(self, widget):
@@ -1156,8 +1345,7 @@ class List_Maker():
 
         if not (filesfx == sfx or filesfx == sfx_old):
             filename = filename + sfx
-      
-        print(filename, filesp, filesfx)
+
         
         if filename:
             title = os.path.basename(filesp)
@@ -1289,7 +1477,6 @@ class List_Maker():
             if not filesfx == sfx:
                 filename = filesp + sfx
                 
-            print(filename)
             if filename: 
                 ls_tracklist = self.get_tracklist()
                 try: 
@@ -1329,8 +1516,6 @@ class List_Maker():
         convert the information in an pl3d file to a python list
         '''
         doc = etree.parse(filename)
-        #print(etree.tostring(doc, pretty_print=True))
-
         pl3d_ns = "http://xspf.org/ns/0/"
         ns = "{%s}" % pl3d_ns
 
@@ -1394,7 +1579,6 @@ class List_Maker():
     def right_click_list_menu(self, treeview, event):
         if event.button == 3: # right click
             selection = treeview.get_selection()
-            #print(selection)
             model, iter = selection.get_selected()
             details = self.get_details(model, iter)
             menu = self.create_context_menu(details)
@@ -1403,21 +1587,24 @@ class List_Maker():
     def get_details(self, model, iter):
         pickle_data = model.get(iter, 0)
         artist = model.get(iter, 2)[0]
-        #print(pickle_data)
         pickle_data = pickle_data[0]
         dict_data = pickle.loads(pickle_data)
         details = (dict_data, artist)
         return details
 
     def create_context_menu(self, details):
+        '''
+        menu to display on right-click of the search result list
+        '''
         context_menu = gtk.Menu()
         details_item = gtk.MenuItem( "Details")
         details_item.connect( "activate", self.show_details, details)
         details_item.show()
         play_item = gtk.MenuItem("Play")
+        play_item.connect( "activate", self.play_from_menu, details)
         play_item.show()
         context_menu.append(details_item)
-        #context_menu.append(play_item)
+        context_menu.append(play_item)
         return context_menu
         
     def show_details(self, w, details):
@@ -1429,32 +1616,49 @@ class List_Maker():
         label_artist = gtk.Label()
         label_artist.set_alignment(0, 0.5)
         label_artist.set_text("Artist: " + artist)
+        label_artist.set_selectable(True)
         dialog.vbox.pack_start(label_artist, True, True, 0)
                 
         label_album = gtk.Label()
         album = dict_data['title']
         label_album.set_text("Album: " + album)
+        label_album.set_selectable(True)
         label_album.set_alignment(0, 0.5)
         dialog.vbox.pack_start(label_album, True, True, 0)
                 
         label_track = gtk.Label()
         track = dict_data['tracktitle']
         label_track.set_text("Track: " + track)
+        label_track.set_selectable(True)
         label_track.set_alignment(0, 0.5)
         dialog.vbox.pack_start(label_track, True, True, 0)
                 
         label_company = gtk.Label()
         label_company.set_alignment(0, 0.5)
+        label_company.set_selectable(True)
         company = dict_data['company']
         label_company.set_text("Company: " + company)
         dialog.vbox.pack_start(label_company, True, True, 0)
-                
+        
+        label_genre = gtk.Label()
+        label_genre.set_alignment(0, 0.5)
+        label_genre.set_selectable(True)
+        genre = dict_data['genre']
+        label_genre.set_text("Genre: " + genre)
+        dialog.vbox.pack_start(label_genre, True, True, 0)
+        
+        label_cpa = gtk.Label()
+        label_cpa.set_alignment(0, 0.5)
+        label_cpa.set_selectable(True)
+        cpa = dict_data['cpa']
+        label_cpa.set_text("Source: " + cpa)
+        dialog.vbox.pack_start(label_cpa, True, True, 0)
+                                
         label_year = gtk.Label()
         label_year.set_alignment(0, 0.5)
+        label_year.set_selectable(True)
         year = dict_data['year']
         year = str(year)
-        print(year)
-        #year = (datetime.datetime.fromtimestamp(year).strftime('%Y'))
         label_year.set_text("Release Year: " + year) 
         dialog.vbox.pack_start(label_year, True, True, 0) 
                 
@@ -1462,11 +1666,13 @@ class List_Maker():
         label_arrivaldate.set_alignment(0, 0.5)
         arrivaldate = dict_data['arrivaldate']
         arrivaldate = str(arrivaldate)
+        label_arrivaldate.set_selectable(True)
         label_arrivaldate.set_text("date arrived: " + arrivaldate)
         dialog.vbox.pack_start(label_arrivaldate, True, True, 0)
                 
         label_demo = gtk.Label()
         label_demo.set_alignment(0, 0.5)
+        label_demo.set_selectable(True)
         demo = dict_data['demo']
         if demo==1:
             demo = "no"
@@ -1479,6 +1685,7 @@ class List_Maker():
         
         label_local = gtk.Label()
         label_local.set_alignment(0, 0.5)
+        label_local.set_selectable(True)
         local = dict_data['local']
         if local==1:
             local = "no"
@@ -1494,6 +1701,7 @@ class List_Maker():
         
         label_female = gtk.Label()
         label_female.set_alignment(0, 0.5)
+        label_female.set_selectable(True)
         female = dict_data['female']
         if female==1:
             female = "no"
@@ -1506,29 +1714,42 @@ class List_Maker():
         dialog.vbox.pack_start(label_female, True, True, 0)        
         label_female.set_text("Female: " + female)
 
-        cdcomment = dict_data['cdcomment']
+        cdcomment = dict_data['comment']
         if cdcomment:
             label_cdcomment = gtk.Label()
             label_cdcomment.set_alignment(0, 0.5)
+            label_cdcomment.set_selectable(True)
             label_cdcomment.set_line_wrap(True)
             label_cdcomment.set_text("Comment: " + cdcomment)
             hs = gtk.HSeparator()
             dialog.vbox.pack_start(hs, True, True, 0)
             dialog.vbox.pack_start(label_cdcomment, True, True, 0)
             
-        comment = dict_data['comment']
-        if comment:        
-            label_comment = gtk.Label()
-            label_comment.set_alignment(0, 0.5)   
-            label_comment.set_line_wrap(True)         
-            label_comment.set_text("Comment: " + comment)        
-            hs = gtk.HSeparator()
-            dialog.vbox.pack_start(hs, True, True, 0)
-            dialog.vbox.pack_start(label_cdcomment, True, True, 0)
-
         dialog.show_all()
         dialog.run()    
         dialog.destroy()        
+
+    def play_from_menu(self, widget, details):
+
+        # Need to look into how the details variable holds the data we need
+        dict_data, artist = details
+        cdid = (dict_data["cdid"])
+        cdid = str(cdid).zfill(7)
+        tracknum = (dict_data["tracknum"])
+        tracknum = str(tracknum).zfill(2)
+        
+        ID = cdid + "-" + tracknum
+        print(ID)
+        filepath = self.get_filepath(ID)
+        print(filepath)
+        if filepath:
+            img = self.btn_pre_play_pause.get_image()
+            if img.get_name() != "play":
+                self.player_pre.stop()
+                          
+            self.btn_pre_play_pause.set_image(self.image_pause)
+            self.player_pre.start(filepath)
+
         
     def convert_time(self, dur):
         s = int(dur)
@@ -1546,7 +1767,6 @@ class List_Maker():
         filename = ID + ".mp3"
         dir_cd = ID[0:-3] + "/"
         filepath = dir_mus + dir_cd + filename
-        #print(filepath)
         if not os.path.isfile(filepath):
             return False
         else:
