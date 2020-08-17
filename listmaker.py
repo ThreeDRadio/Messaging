@@ -1722,9 +1722,10 @@ class List_Maker():
         label_demo.set_alignment(0, 0.5)
         label_demo.set_selectable(True)
         demo = dict_details['demo']
-        demo = unys[demo]
-        label_demo.set_text(demo)
-        table_details.attach(label_demo, 1, 2, n, n + 1, False, False, 5, 0)
+        if demo:
+            demo = unys[demo]
+            label_demo.set_text(demo)
+            table_details.attach(label_demo, 1, 2, n, n + 1, False, False, 5, 0)
         
         n += 1
         
