@@ -42,6 +42,7 @@ pg_cat_database = config.get('Common', 'pg_cat_database')
 #other variables
 sfx = ".p3d"
 sfx_old = ".pl3d"
+
         
 #lists and dictionaries 
 unys = ("unknown", "no", "yes", "some")
@@ -260,9 +261,9 @@ class List_Maker():
         # vbox for catalogue list
         vbox_cat_lst = gtk.VBox(False, 0)
         # scrolled window for catalogue list treeview
-        sw_cat_lst = gtk.ScrolledWindow()
-        sw_cat_lst.set_shadow_type(gtk.SHADOW_ETCHED_IN)
-        sw_cat_lst.set_policy(gtk.POLICY_NEVER, gtk.POLICY_AUTOMATIC) 
+        self.sw_cat_lst = gtk.ScrolledWindow()
+        self.sw_cat_lst.set_shadow_type(gtk.SHADOW_ETCHED_IN)
+        self.sw_cat_lst.set_policy(gtk.POLICY_NEVER, gtk.POLICY_AUTOMATIC) 
         
         # hbox for preview player buttons
         hbox_pre_btn = gtk.HBox(False, 0)  
@@ -442,9 +443,10 @@ class List_Maker():
         self.treeview_pl.connect("drag_data_get", self.pl_drag_data_get_data)
         self.treeview_pl.connect("drag_data_received",
                               self.drag_data_received_data)
-
+        self.sw_cat_lst.connect("size-allocate", self.resize_check)
         self.window.connect("delete_event", self.delete_event)
         self.window.connect("destroy", self.destroy)
+        
         treeselection_cat.connect('changed', self.cat_selection_changed)
         #btn_cat_simple.connect("clicked", self.simple_search)
         #self.entry_search_simple.connect("activate", self.simple_search)
@@ -519,10 +521,10 @@ class List_Maker():
         vbox_cat_search.pack_start(btn_search, False)
         #vbox_cat_search.pack_start(self.entry_search_adv, False)  
         vbox_cat_search.pack_start(self.label_search_result, False)
-        sw_cat_lst.add(self.treeview_cat)
+        self.sw_cat_lst.add(self.treeview_cat)
         sw_pl.add(self.treeview_pl)   
         vbox_cat_lst.pack_start(label_results, False)
-        vbox_cat_lst.pack_start(sw_cat_lst, True)
+        vbox_cat_lst.pack_start(self.sw_cat_lst, True)
         vbox_cat_lst.pack_start(hbox_pre_btn, False)
 
 
@@ -562,6 +564,9 @@ class List_Maker():
         Columns for the list of search results. The first column is hidden 
         and contains all the information about the track/CD in that row
         '''        
+        # variable to use with window/sw resize
+        self.column_width = 240
+        
         #Column ONE
         column = gtk.TreeViewColumn('Dict', gtk.CellRendererText(),
                                     text=0)
@@ -570,34 +575,45 @@ class List_Maker():
         treeview.append_column(column)
                 
         #Column TWO
-        column = gtk.TreeViewColumn('Artist / Album', gtk.CellRendererText(),
+        column = gtk.TreeViewColumn('', gtk.CellRendererText(),
                                     text=1)
         column.set_sort_column_id(1)
         column.set_clickable(False)
-        column.set_resizable(True)
-        #column.set_sizing(gtk.TREE_VIEW_COLUMN_FIXED)
-        #column.set_fixed_width(240)
-        column.set_sizing(gtk.TREE_VIEW_COLUMN_AUTOSIZE)
+        #column.set_resizable(True)
+        column.set_sizing(gtk.TREE_VIEW_COLUMN_FIXED)
+        column.set_fixed_width(self.column_width)
+        #column.set_sizing(gtk.TREE_VIEW_COLUMN_AUTOSIZE)
         treeview.append_column(column)
        
         #Column THREE
-        column = gtk.TreeViewColumn('Title', gtk.CellRendererText(),
+        column = gtk.TreeViewColumn('', gtk.CellRendererText(),
                                     text=2)
         column.set_sort_column_id(2)
         column.set_clickable(False)
-        column.set_resizable(True)
-        column.set_sizing(gtk.TREE_VIEW_COLUMN_AUTOSIZE)
-        #column.set_sizing(gtk.TREE_VIEW_COLUMN_FIXED)
-        #column.set_fixed_width(240)
+        #column.set_resizable(True)
+        #column.set_sizing(gtk.TREE_VIEW_COLUMN_AUTOSIZE)
+        column.set_sizing(gtk.TREE_VIEW_COLUMN_FIXED)
+        column.set_fixed_width(self.column_width)
         treeview.append_column(column)
 
         #Column FOUR
-        column = gtk.TreeViewColumn('Time', gtk.CellRendererText(),
+        column = gtk.TreeViewColumn('', gtk.CellRendererText(),
                                     text=3)
         column.set_sort_column_id(3)
         column.set_sizing(gtk.TREE_VIEW_COLUMN_FIXED)
         column.set_fixed_width(60)
         treeview.append_column(column)
+        
+    def resize_check(self, widget, allocation):
+        #allocation = self.sw_cat_lst.get_allocation()
+        width = allocation.width
+        required_width = (width - 66) / 2
+        if required_width != self.column_width:
+            for columnid in (1, 2):
+                self.column_width = required_width
+                column = self.treeview_cat.get_column(columnid)
+                column.set_fixed_width(self.column_width)
+                print self.column_width
         
     def add_pl_columns(self, treeview):
         '''
@@ -1061,6 +1077,20 @@ class List_Maker():
             dur_time = self.convert_time(int_time)
             artist_album = artist + '\n' + album
             
+            # include quota details
+            quota = "Local:    "
+            local = item["local"]
+            if not local:
+                local = 0
+            local = unys[local]
+            quota += local
+            quota += "\nFemale:  "
+            female = item["female"]
+            if not female:
+                female = 0
+            female = unys[female]
+            quota += female    
+                    
             if not album:
                 album = "(No Title)"
 
@@ -1073,7 +1103,8 @@ class List_Maker():
                         del cd_dict[column]
                     cd_pickle = pickle.dumps(cd_dict)
 
-                n = model.append(None, [cd_pickle, artist_album, "", ""])
+
+                n = model.append(None, [cd_pickle, artist_album, quota, ""])
                 model.append(n, [pickle_list, trackartist, tracktitle, dur_time])
             else:
                 model.append(n, [pickle_list, trackartist, tracktitle, dur_time])
@@ -1704,8 +1735,7 @@ class List_Maker():
             
             label_tracklength = gtk.Label()
             tracklength = dict_details['tracklength']
-            int_tracklength = int(tracklength)/1000
-            str_tracklength = self.convert_time(int_tracklength)
+            str_tracklength = self.convert_time(tracklength)
             label_tracklength.set_text(str_tracklength)
             label_tracklength.set_selectable(True)
             label_tracklength.set_alignment(0, 0.5)
@@ -1722,6 +1752,8 @@ class List_Maker():
         label_demo.set_alignment(0, 0.5)
         label_demo.set_selectable(True)
         demo = dict_details['demo']
+        if not demo:
+            demo = 0
         demo = unys[demo]
         label_demo.set_text(demo)
         table_details.attach(label_demo, 1, 2, n, n + 1, False, False, 5, 0)
@@ -1865,7 +1897,6 @@ class List_Maker():
         label_comment.set_line_wrap(True)        
         
         cdcomment = dict_details['comment']
-        print(cdcomment)
         if cdcomment:
             label_comment.set_text(cdcomment)
             table_details.attach(label_comment, 1, 2, n, n + 1, False, False, 5, 0)
@@ -1875,9 +1906,6 @@ class List_Maker():
         dialog.destroy()        
 
     def play_from_menu(self, widget, treeview):
-
-        # Need to look into how the details variable holds the data we need
-
         selection = treeview.get_selection()
         model, iter = selection.get_selected()
         dict_data = self.get_details(model, iter)        
@@ -1887,9 +1915,9 @@ class List_Maker():
         tracknum = str(tracknum).zfill(2)
         
         ID = cdid + "-" + tracknum
-        print(ID)
+        # print(ID)
         filepath = self.get_filepath(ID)
-        print(filepath)
+        # print(filepath)
         if filepath:
             img = self.btn_pre_play_pause.get_image()
             if img.get_name() != "play":
