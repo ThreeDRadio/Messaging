@@ -319,7 +319,7 @@ class List_Maker():
         self.entry_search_genre = gtk.Entry(50)        
         label_search_com = gtk.Label("Comments")
         self.entry_search_com = gtk.Entry(50)
-        label_search_cpa = gtk.Label("Source")
+        label_search_cpa = gtk.Label("Country")
         self.entry_search_cpa = gtk.Entry(50)
         label_search_year = gtk.Label("Release year")
         self.entry_search_year = gtk.Entry(4)
@@ -613,8 +613,7 @@ class List_Maker():
                 self.column_width = required_width
                 column = self.treeview_cat.get_column(columnid)
                 column.set_fixed_width(self.column_width)
-                print self.column_width
-        
+                        
     def add_pl_columns(self, treeview):
         '''
         Columns for the playlist of tracks. The first column is hidden 
@@ -718,7 +717,7 @@ class List_Maker():
         if ID and  int_time:
             filepath = self.get_filepath(ID)
             #remove the check for testing where there are no files
-            print(filepath)
+            #print(filepath)
             if not filepath:
                 str_error = "Unable to add to the list, file does not exist. That track has probably not yet been ripped into the music store"
                 self.error_dialog(str_error) 
