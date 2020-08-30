@@ -359,7 +359,7 @@ class List_Maker():
         #label_results.set_size_request(80, 30)
 
         #make the list
-        self.store_cat = gtk.TreeStore(str ,str ,str, str)
+        self.store_cat = gtk.TreeStore(str ,str ,str, str, str)
         self.treeview_cat = gtk.TreeView(self.store_cat)
         self.treeview_cat.set_rules_hint(True)
         treeselection_cat = self.treeview_cat.get_selection()
@@ -565,7 +565,7 @@ class List_Maker():
         and contains all the information about the track/CD in that row
         '''        
         # variable to use with window/sw resize
-        self.column_width = 240
+        self.column_width = 210
         
         #Column ONE
         column = gtk.TreeViewColumn('Dict', gtk.CellRendererText(),
@@ -575,7 +575,7 @@ class List_Maker():
         treeview.append_column(column)
                 
         #Column TWO
-        column = gtk.TreeViewColumn('', gtk.CellRendererText(),
+        column = gtk.TreeViewColumn('Artist', gtk.CellRendererText(),
                                     text=1)
         column.set_sort_column_id(1)
         column.set_clickable(False)
@@ -586,7 +586,7 @@ class List_Maker():
         treeview.append_column(column)
        
         #Column THREE
-        column = gtk.TreeViewColumn('', gtk.CellRendererText(),
+        column = gtk.TreeViewColumn('Album/Title', gtk.CellRendererText(),
                                     text=2)
         column.set_sort_column_id(2)
         column.set_clickable(False)
@@ -597,17 +597,27 @@ class List_Maker():
         treeview.append_column(column)
 
         #Column FOUR
-        column = gtk.TreeViewColumn('', gtk.CellRendererText(),
+        column = gtk.TreeViewColumn('Quota', gtk.CellRendererText(),
                                     text=3)
         column.set_sort_column_id(3)
+        column.set_clickable(False)
         column.set_sizing(gtk.TREE_VIEW_COLUMN_FIXED)
-        column.set_fixed_width(60)
+        column.set_fixed_width(66)
         treeview.append_column(column)
+        
+        #Column FIVE
+        column = gtk.TreeViewColumn('Length', gtk.CellRendererText(),
+                                    text=4)
+        column.set_sort_column_id(4)
+        column.set_clickable(False)
+        column.set_sizing(gtk.TREE_VIEW_COLUMN_FIXED)
+        column.set_fixed_width(68)
+        treeview.append_column(column)        
         
     def resize_check(self, widget, allocation):
         #allocation = self.sw_cat_lst.get_allocation()
         width = allocation.width
-        required_width = (width - 66) / 2
+        required_width = (width - 140) / 2
         if required_width != self.column_width:
             for columnid in (1, 2):
                 self.column_width = required_width
@@ -1074,20 +1084,35 @@ class List_Maker():
             int_time = item['tracklength']
             int_time = int(int_time)
             dur_time = self.convert_time(int_time)
-            artist_album = artist + '\n' + album
+            #artist_album = artist + '\n' + album
             
             # include quota details
-            quota = "Local:    "
+            quota = "  "
             local = item["local"]
             if not local:
-                local = 0
-            local = unys[local]
+                local = "?  "
+            elif local == 0:
+                local = "?  "
+            elif local == 1:
+                local = "-  "
+            elif local == 2:
+                local = "L  "
+            elif local == 3:
+                local = "S  "
+            #local = unys[local]
             quota += local
-            quota += "\nFemale:  "
+            
             female = item["female"]
             if not female:
-                female = 0
-            female = unys[female]
+                female = "?  "
+            if female == 0:
+                female = "?  "
+            elif female == 1:
+                female = "-  "
+            elif female == 2:
+                female = "F  "
+            elif female == 3:
+                female = "S  "
             quota += female    
                     
             if not album:
@@ -1103,10 +1128,10 @@ class List_Maker():
                     cd_pickle = pickle.dumps(cd_dict)
 
 
-                n = model.append(None, [cd_pickle, artist_album, quota, ""])
-                model.append(n, [pickle_list, trackartist, tracktitle, dur_time])
+                n = model.append(None, [cd_pickle, artist, album, quota, ""])
+                model.append(n, [pickle_list, trackartist, tracktitle, "", dur_time])
             else:
-                model.append(n, [pickle_list, trackartist, tracktitle, dur_time])
+                model.append(n, [pickle_list, trackartist, tracktitle, "", dur_time])
             var_album = album
         
     def get_dict_creator(self):
