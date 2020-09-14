@@ -669,13 +669,8 @@ class List_Maker():
         treeselection = treeview.get_selection()
         model, iter = treeselection.get_selected()
         
-        #if the tracktime column is ("", ) then the CD has been selected, 
-        tracktime = model.get(iter, 3)
-        if not tracktime[0]:
-            pickle_data = ""
-        else:
-            pickle_data = model.get(iter, 0)
-            pickle_data = pickle_data[0]
+        pickle_data = model.get(iter, 0)
+        pickle_data = pickle_data[0]
             
         selection.set(gtk.gdk.SELECTION_TYPE_STRING, 8, pickle_data)
 
@@ -702,10 +697,9 @@ class List_Maker():
         '''
         model = treeview.get_model()
         pickle_data = selection.get_text()
-
         dict_data = pickle.loads(pickle_data)
-        track_id = dict_data['trackid']
-        if not track_id:
+
+        if 'trackid' not in dict_data:
             str_error = "Looks like you just tried to add a CD rather than a track"
             self.error_dialog(str_error)
             return
@@ -1049,7 +1043,8 @@ class List_Maker():
         full search details for each item go into the hidden column 
         '''
 
-        # remove extra results caused by multiple comments and concatenate comments
+        # remove extra results caused by multiple comments 
+        # and then concatenate the comments
         
         dict_result = []
         first = True
