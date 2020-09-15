@@ -771,19 +771,23 @@ class List_Maker():
         '''
         run functions which query the database and display the results as a list
         '''
-        result = self.query_catalogue()
+        search_terms = self.get_search_terms()
+        query = self.create_query(search_terms)
+        result = self.execute_query(query, search_terms)
+        
         if result:
             int_res = len(result)
             self.update_result_label(int_res)
             self.length_check(result)
-            self.add_to_cat_store(result)
+            dict_data = self.process_result(result)
+            self.add_to_cat_store(dict_data)
             
         else:
             self.clear_cat_list()
             int_res = 0
             self.update_result_label(int_res)
     
-    def query_catalogue(self):
+    def get_search_terms(self):
         '''
         Make a query to the catalogue database based on the user input. 
         Return the results.
@@ -869,10 +873,6 @@ class List_Maker():
             nr_delta = datetime.timedelta(days=60)
             nr = today - nr_delta
             search_terms["cd.arrivaldate"] = nr 
-
-            
-
-        #query according to the text
         
         str_error_none = "I can't see what you are searching for"
         str_error_len = "Please enter more than one character in your search"
@@ -880,6 +880,9 @@ class List_Maker():
         if not (artist or album or track or company or comments or creator or genre or new_release or year or cpa):
             self.error_dialog(str_error_none)
             return False
+            
+
+        return search_terms
         
         '''
         # comment this out for now.
@@ -891,7 +894,7 @@ class List_Maker():
                     return False
         '''            
 
-        
+    def create_query(self, search_terms):
         select_statement = sql.SQL("SELECT")
         
         for i, item in enumerate(select_items):
@@ -981,7 +984,11 @@ class List_Maker():
         )
 
         query = sql.SQL(' ').join([select_statement, from_statement, where_statement, order_statement, limit_statement])
-   
+        return query
+        
+
+        
+    def execute_query(self, query, search_terms):
         conn = self.pg_connect_cat()
         
         # show the query for debugging
@@ -1036,8 +1043,25 @@ class List_Maker():
             str_warn_3 = "or increase the number for the Maximum Results."
             str_warn = str_warn_0 + str(query_limit) + str_warn_1 + str(query_limit) + str_warn_2
             self.warn_dialog(str_warn)
+
+    def process_result(self, result):
+        dict_data = []
+        first = True
+        separator = '''
+        -----------------------
+        '''
+        for item in result:
+            if first:
+                dict_data.append(item)
+                first = False
+            else:
+                if item["trackid"] == dict_data[-1]["trackid"]:
+                    dict_data[-1]["comment"] = dict_data[-1]["comment"] + separator + item["comment"]
+                else:
+                    dict_data.append(item)
+        return dict_data
     
-    def add_to_cat_store(self, result):
+    def add_to_cat_store(self, dict_data):
         '''
         take the results of the search and display as rows in a treeview list
         full search details for each item go into the hidden column 
@@ -1046,25 +1070,12 @@ class List_Maker():
         # remove extra results caused by multiple comments 
         # and then concatenate the comments
         
-        dict_result = []
-        first = True
-        separator = '''
-        -----------------------
-        '''
-        for item in result:
-            if first:
-                dict_result.append(item)
-                first = False
-            else:
-                if item["trackid"] == dict_result[-1]["trackid"]:
-                    dict_result[-1]["comment"] = dict_result[-1]["comment"] + separator + item["comment"]
-                else:
-                    dict_result.append(item)
+
 
         self.clear_cat_list()
         var_album = ""
             
-        for item in dict_result:
+        for item in dict_data:
             model = self.treeview_cat.get_model()
 
             pickle_list = pickle.dumps(item)
@@ -1414,11 +1425,31 @@ class List_Maker():
             self.changed = False
             
         if filesfx == ".p3d":
-            self.open_pl(filename)
+            ls_data = pickle.load(open(filename, "rb"))
             
         elif filesfx == ".pl3d":
+            ls_data = self.pl3d2pylist(filename)
 
-            self.open_pl_xml(filename)
+        model = self.treeview_pl.get_model()
+        model.clear()
+        
+        for dict_data in ls_data:
+            int_time = dict_data['tracklength']
+            tracktime = self.convert_time(int_time)
+            tracktitle = dict_data['tracktitle']
+            trackartist = dict_data['trackartist']
+            
+            if not trackartist:
+                artist = dict_data['artist']
+                trackartist = artist
+                
+            tracktitle = trackartist + '\n' + tracktitle
+            pickle_data = pickle.dumps(dict_data)
+                
+            model.append((pickle_data, tracktitle, trackartist, tracktime))
+            
+            self.update_time_total()
+            self.name_of_open_file = filename
 
     def save_change(self):
         dialog = gtk.Dialog("Save List?", None, 0, 
@@ -1442,84 +1473,6 @@ class List_Maker():
         if response == gtk.RESPONSE_OK:
             self.save(None)
         dialog.destroy()
-
-    def open_pl(self, filename):
-
-        ls_data = pickle.load(open(filename, "rb"))
-
-
-        model = self.treeview_pl.get_model()
-        for dict_data in ls_data:
-
-            int_time = dict_data['tracklength']
-            tracktime = self.convert_time(int_time)
-            tracktitle = dict_data['tracktitle']
-            trackartist = dict_data['trackartist']
-            if not trackartist:
-                artist = dict_data['artist']
-                trackartist = artist
-                
-            pickle_data = pickle.dumps(dict_data)
-                
-            model.append((pickle_data, tracktitle, trackartist, tracktime))
-            
-            self.update_time_total()
-            self.name_of_open_file = filename
-        
-    def open_pl_xml(self, filename):
-        '''
-        open the deprecated playlist
-        '''    
-        if filename:
-            ls_tracklist = self.pl3d2pylist(filename)
-            model = self.treeview_pl.get_model()
-            model.clear()
-            for item in ls_tracklist:
-                title = item[0]
-                
-                #identifier is the track ID within a URL
-                #eg http://threedradio.com/1234
-                identifier = item[1]
-                if identifier:
-                    track_id = os.path.split(identifier)[1]
-                
-                #location is the filepath. It contains the track number and CD ID 
-                location = item[2]
-                cdid, tracknum = location.split("-")
-
-                cdid = int(cdid)
-                tracknum = int(tracknum)
-                album = item[3]
-                creator = item[4]
-                
-                #the annotation element is used to hold the company name
-                annotation = item[5]
-                company = annotation
-                
-                #duration is in milliseconds
-                duration = item[6]
-                if duration:
-                    int_dur = int(duration)/1000
-                    str_dur = self.convert_time(int_dur)
-                
-                dict_row = {"tracktitle": title, 
-                            "track_id": track_id, 
-                            "cdid": cdid, 
-                            "tracknum": tracknum, 
-                            "album": album, 
-                            "artist": "", 
-                            "trackartist": creator, 
-                            "company": company, 
-                            "str_dur": str_dur, 
-                            "tracklength": int_dur}
-                            
-                pickle_row = pickle.dumps(dict_row)
-                
-                row = (pickle_row, title, creator, str_dur)
-                model.append(row)
-            
-            self.update_time_total()
-            self.name_of_open_file = filename
                         
     def save(self, widget):
         '''
@@ -1579,61 +1532,25 @@ class List_Maker():
         doc = etree.parse(filename)
         pl3d_ns = "http://xspf.org/ns/0/"
         ns = "{%s}" % pl3d_ns
-
         el_tracklist = doc.findall("//%strack" % ns)
-
         ls_tracklist = []
+        ls_data = []
 
         for track in el_tracklist:
-
-            if track.find("%stitle" % ns) is not None:
-                str_title = track.find("%stitle" % ns).text
-            else:
-                str_title = None
-                
             if track.find("%sidentifier" % ns) is not None:
-                str_identifier = track.find("%sidentifier" % ns).text
-            else:
-                str_identifier = None
-                
-            if track.find("%slocation" % ns) is not None:
-                str_location = track.find("%slocation" % ns).text
-            else:
-                str_location = None
-
-            if track.find("%salbum" % ns) is not None:
-                str_album = track.find("%salbum" % ns).text
-            else:
-                str_album = None     
-                           
-            if track.find("%screator" % ns) is not None:
-                str_creator = track.find("%screator" % ns).text
-            else:
-                str_creator = None
-                
-            if track.find("%sannotation" % ns) is not None:
-                str_annotation = track.find("%sannotation" % ns).text
-            else:
-                str_annotation = None
-
-            if track.find("%sduration" % ns) is not None:
-                str_duration = track.find("%sduration" % ns).text
-            else:
-                str_duration = None
-
-            tp_track = (
-                str_title, 
-                str_identifier, 
-                str_location, 
-                str_album, 
-                str_creator, 
-                str_annotation, 
-                str_duration
-                )
-                
-            ls_tracklist.append(tp_track)
+                trackid = track.find("%sidentifier" % ns).text
+                trackid = int(trackid)
+                ls_tracklist.append(trackid)
+        
+        for trackid in ls_tracklist:
+            search_terms = {}
+            search_terms["cdtrack.trackid"] = trackid
+            query = self.create_query(search_terms)
+            result = self.execute_query(query, search_terms)
+            dict_data = self.process_result(result)
+            ls_data += dict_data
             
-        return ls_tracklist
+        return ls_data
 
 
     #common functions
