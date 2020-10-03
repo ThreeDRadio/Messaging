@@ -470,6 +470,8 @@ class List_Maker():
         btn_saveas.connect("clicked", self.saveas)
         
         self.treeview_cat.connect('button-release-event' , self.right_click_list_menu)
+        self.treeview_pl.connect('button-release-event' , self.right_click_list_menu)
+        
         ### do the packing ###
 
         hbox_pre_btn.pack_start(self.btn_pre_play_pause, False)
@@ -667,11 +669,9 @@ class List_Maker():
         for drag n drop from the search results list.
         '''
         treeselection = treeview.get_selection()
-        model, iter = treeselection.get_selected()
+        model, tree_iter = treeselection.get_selected()
         
-        pickle_data = model.get(iter, 0)
-        pickle_data = pickle_data[0]
-            
+        pickle_data = model.get_value(tree_iter, 0)
         selection.set(gtk.gdk.SELECTION_TYPE_STRING, 8, pickle_data)
 
     def pl_drag_data_get_data(self, treeview, context, selection, target_id,
@@ -681,14 +681,10 @@ class List_Maker():
         for drag n drop within the playlist.
         '''                                                           
         treeselection = treeview.get_selection()
-        model, iter = treeselection.get_selected()
-        
-
-        pickle_data = model.get(iter, 0)
-        pickle_data = pickle_data[0]
-            
+        model, tree_iter = treeselection.get_selected()
+        pickle_data = model.get_value(tree_iter, 0)
         selection.set(gtk.gdk.SELECTION_TYPE_STRING, 8, pickle_data)
-        model.remove(iter)
+        model.remove(tree_iter)
         
     def drag_data_received_data(self, treeview, context, x, y, selection,
                                 info, etime):
@@ -730,15 +726,15 @@ class List_Maker():
                 drop_info = treeview.get_dest_row_at_pos(x, y)
                 if drop_info:
                     path, position = drop_info
-                    iter = model.get_iter(path)
+                    tree_iter = model.get_iter(path)
                     if (position == gtk.TREE_VIEW_DROP_BEFORE
                         or position == gtk.TREE_VIEW_DROP_INTO_OR_BEFORE):
-                        model.insert_before(iter, list_data)
-                        #self.join_drop(model, iter, True)
+                        model.insert_before(tree_iter, list_data)
+                        #self.join_drop(model, tree_iter, True)
 
                     else:
-                        model.insert_after(iter, list_data)
-                        #self.join_drop(model, iter, False)
+                        model.insert_after(tree_iter, list_data)
+                        #self.join_drop(model, tree_iter, False)
                         
                 else:
                     model.append(list_data)
@@ -1225,9 +1221,8 @@ class List_Maker():
         then call the function to get the full path 
         '''
         treeselection = self.treeview_cat.get_selection()
-        model, iter = treeselection.get_selected()
-        pickle_list = model.get(iter, 0)
-        pickle_list = pickle_list[0]
+        model, tree_iter = treeselection.get_selected()
+        pickle_list = model.get_value(tree_iter, 0)
         data_list = pickle.loads(pickle_list)
         ID = data_list['cdid']
         tracknum = data_list['tracknum']
@@ -1285,15 +1280,15 @@ class List_Maker():
     # playlist section
     def update_time_total(self):
         model = self.treeview_pl.get_model()
-        iter = model.get_iter_first()
+        tree_iter = model.get_iter_first()
         total_time = 0
-        while iter:
-            pickle_data = model.get_value(iter, 0)
+        while tree_iter:
+            pickle_data = model.get_value(tree_iter, 0)
             dict_data = pickle.loads(pickle_data)
             int_time = dict_data['tracklength']
             int_time = int(int_time)
             total_time = total_time + int_time
-            iter = model.iter_next(iter)
+            tree_iter = model.iter_next(tree_iter)
         str_time = self.convert_time(total_time)
         self.label_time_1.set_text(str_time + "  ")
 
@@ -1377,28 +1372,28 @@ class List_Maker():
 
     def remove_row(self, widget):    
         treeselection = self.treeview_pl.get_selection()
-        model, iter = treeselection.get_selected()
-        if iter:
-            model.remove(iter) 
+        model, tree_iter = treeselection.get_selected()
+        if tree_iter:
+            model.remove(tree_iter) 
             model = self.treeview_pl.get_model()
             self.changed = True
         else:
             print("Nothing selected")
-        iter = model.get_iter_first()
-        if iter:
+        tree_iter = model.get_iter_first()
+        if tree_iter:
             self.update_time_total()
         else:
             self.label_time_1.set_text("00:00  ")
 
     def get_tracklist(self):
         model = self.treeview_pl.get_model()
-        iter = model.get_iter_first()
+        tree_iter = model.get_iter_first()
         ls_tracklist = []
-        while iter:
-            pickle_row = model.get(iter, 0)[0]
+        while tree_iter:
+            pickle_row = model.get_value(tree_iter, 0)
             dict_row = pickle.loads(pickle_row)
             ls_tracklist.append(dict_row)
-            iter = model.iter_next(iter)
+            tree_iter = model.iter_next(tree_iter)
 
         return ls_tracklist
             
@@ -1569,8 +1564,8 @@ class List_Maker():
             
     def get_details(self, treeview):
         selection = treeview.get_selection()
-        model, iter = selection.get_selected()
-        pickle_data = model.get(iter, 0)[0]
+        model, tree_iter = selection.get_selected()
+        pickle_data = model.get_value(tree_iter, 0)
         dict_data = pickle.loads(pickle_data)
         return dict_data
         
@@ -1842,9 +1837,7 @@ class List_Maker():
         dialog.destroy()        
 
     def play_from_menu(self, widget, treeview):
-        selection = treeview.get_selection()
-        model, iter = selection.get_selected()
-        dict_data = self.get_details(model, iter)        
+        dict_data = self.get_details(treeview)        
         cdid = (dict_data["cdid"])
         cdid = str(cdid).zfill(7)
         tracknum = (dict_data["tracknum"])
@@ -1855,9 +1848,7 @@ class List_Maker():
         filepath = self.get_filepath(ID)
         # print(filepath)
         if filepath:
-            img = self.btn_pre_play_pause.get_image()
-            if img.get_name() != "play":
-                self.player_pre.stop()
+            self.player_pre.stop()
                           
             self.btn_pre_play_pause.set_image(self.image_pause)
             self.player_pre.start(filepath)
