@@ -1551,6 +1551,14 @@ class List_Maker():
     #common functions
     def right_click_cat_list_menu(self, treeview, event):
         if event.button == 3: # right click
+            
+            selection = treeview.get_selection()
+            model, tree_iter = selection.get_selected()
+            pickle_data = model.get_value(tree_iter, 0)
+            dict_data = pickle.loads(pickle_data)
+            
+            
+            
             context_menu = gtk.Menu()
             details_item = gtk.MenuItem( "Details")
             details_item.connect( "activate", self.show_details, treeview)
@@ -1564,6 +1572,11 @@ class List_Maker():
             context_menu.append(details_item)
             context_menu.append(play_item)
             context_menu.append(add_item)
+            
+            if not 'trackid' in dict_data:
+                play_item.set_sensitive(False)
+                add_item.set_sensitive(False)
+                
             context_menu.popup( None, None, None, event.button, event.get_time())
     
     def right_click_pl_list_menu(self, treeview, event):
