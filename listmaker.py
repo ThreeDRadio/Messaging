@@ -409,7 +409,7 @@ class List_Maker():
         label_pl.modify_font(subheader_font_1)
         label_pl.set_size_request(80, 30)     
         
-        btn_inf = gtk.Button("Info")
+        btn_inf = gtk.Button("Details")
         btn_inf.set_tooltip_text("Information about the selected track")
         btn_rem = gtk.Button("Remove")
         btn_rem.set_tooltip_text("Remove the selected track from the playlist")
@@ -469,8 +469,8 @@ class List_Maker():
         btn_save.connect("clicked", self.save)
         btn_saveas.connect("clicked", self.saveas)
         
-        self.treeview_cat.connect('button-release-event' , self.right_click_list_menu)
-        self.treeview_pl.connect('button-release-event' , self.right_click_list_menu)
+        self.treeview_cat.connect('button-release-event' , self.right_click_cat_list_menu)
+        self.treeview_pl.connect('button-release-event' , self.right_click_pl_list_menu)
         
         ### do the packing ###
 
@@ -1549,7 +1549,24 @@ class List_Maker():
 
 
     #common functions
-    def right_click_list_menu(self, treeview, event):
+    def right_click_cat_list_menu(self, treeview, event):
+        if event.button == 3: # right click
+            context_menu = gtk.Menu()
+            details_item = gtk.MenuItem( "Details")
+            details_item.connect( "activate", self.show_details, treeview)
+            details_item.show()
+            play_item = gtk.MenuItem("Play")
+            play_item.connect("activate", self.play_from_menu, treeview)
+            play_item.show()
+            add_item = gtk.MenuItem("Add")
+            add_item.connect("activate", self.add_to_playlist, treeview)
+            add_item.show()
+            context_menu.append(details_item)
+            context_menu.append(play_item)
+            context_menu.append(add_item)
+            context_menu.popup( None, None, None, event.button, event.get_time())
+    
+    def right_click_pl_list_menu(self, treeview, event):
         if event.button == 3: # right click
             context_menu = gtk.Menu()
             details_item = gtk.MenuItem( "Details")
@@ -1561,7 +1578,38 @@ class List_Maker():
             context_menu.append(details_item)
             context_menu.append(play_item)
             context_menu.popup( None, None, None, event.button, event.get_time())
+  
+    def add_to_playlist(self, treeview):
+        '''
+        from right-click menu add the selected track to the playlist
+        '''
+    def add_to_playlist(self, widget, treeview):
+        '''
+        from right-click menu add the selected track to the playlist
+        '''
+        selection = treeview.get_selection()
+        model, tree_iter = selection.get_selected()
+        pickle_data = model.get_value(tree_iter, 0)
+        dict_data = pickle.loads(pickle_data)
+        
+        if 'trackid' in dict_data:
+            model = self.treeview_pl.get_model()
+            int_time = dict_data['tracklength']
+            tracktime = self.convert_time(int_time)
+            cd_code = str(format(dict_data['cdid'], '07d')) # 7 digit
+            track_no = str(format(dict_data['tracknum'], '02d')) # 2 digit
+            tracktitle = dict_data['tracktitle']
+            trackartist = dict_data['trackartist']
+            artist = dict_data['artist']
             
+            if not trackartist:
+                trackartist = artist
+            
+            tracktitle = trackartist + '\n' + tracktitle
+            list_data = (pickle_data, tracktitle, trackartist, tracktime)
+            model.append(list_data)
+        
+        
     def get_details(self, treeview):
         selection = treeview.get_selection()
         model, tree_iter = selection.get_selected()
@@ -1569,7 +1617,7 @@ class List_Maker():
         dict_data = pickle.loads(pickle_data)
         return dict_data
         
-    def show_details(self, w, treeview):
+    def show_details(self, widget, treeview):
         
         dialog = gtk.Dialog("Details", None, 0, (
             gtk.STOCK_OK, gtk.RESPONSE_OK))
