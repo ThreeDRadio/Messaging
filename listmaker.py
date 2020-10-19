@@ -76,6 +76,7 @@ order_results = {
             "Oldest Albums First": (("year", "ASC"), ("id", "ASC")),
             "Artist Alphabetical": (("artist", "ASC"), ("id", "DESC")),
             "Album Alphabetical": (("title", "ASC"), ("id", "DESC"))
+            "Most Recently Added":(("createwhen", "DESC"), ("id", "DESC"))
 }
 
 class Preview_Player:
