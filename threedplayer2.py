@@ -369,7 +369,7 @@ class Broadcast_Player:
     Plays the selected track, outputs to the souncard with the 
     alias 'broadcast' as defined in /etc/asound.conf
     '''
-    def __init__(self, time_label, progressbar, label_air_warning, check_join):
+    def __init__(self, time_label, label_length, progressbar, label_air_warning, check_join):
         self.player = gst.element_factory_make("playbin2", "player")
         fakesink = gst.element_factory_make("fakesink", "fakesink")
         alsa_card0 = gst.element_factory_make("alsasink", "broadcast") 
@@ -384,6 +384,7 @@ class Broadcast_Player:
         
         #set statusbar ref.
         self.time_label = time_label
+        self.label_length = label_length
         self.progressbar = progressbar
         self.label_air_warning = label_air_warning
         self.check_join = check_join
@@ -460,7 +461,7 @@ class Broadcast_Player:
                 self.duration_time = dur_int / 1000000000
                 
                 gtk.gdk.threads_enter()
-                self.time_label.set_text(dur_str + " / " + dur_str)
+                self.time_label.set_text(dur_str)
                 
                 #set progressbar
                 self.progressbar.set_fraction(0)
@@ -495,13 +496,14 @@ class Broadcast_Player:
                     fraction = float(pos_int) / dur_int
                     self.progressbar.set_fraction(fraction)
                 
-                self.time_label.set_text(rem_str + " / " + dur_str)
+                self.time_label.set_text(rem_str)
                 
                 gtk.gdk.threads_leave()
             time.sleep(1)
       
     def reset_components(self):  
-        self.time_label.set_text("00:00 / 00:00")
+        self.time_label.set_text("00:00")
+        self.label_length.set_text("00:00")
         self.progressbar.set_fraction(0)
         self.progressbar.set_text("")
         self.label_air_warning("not playing")
@@ -622,7 +624,9 @@ class ThreeD_Player():
         # vbox for preview section
         vbox_pre = gtk.VBox(False, 2)  
         # hbox for preview player buttons
-        hbox_pre_btn = gtk.HBox(False, 0)        
+        hbox_pre_btn = gtk.HBox(False, 0)   
+        # hbox for the clock
+        hbox_pre_time = gtk.HBox(False, 0)     
 
         
         ### ----------------Message List Section---------------- ###   
@@ -792,12 +796,17 @@ class ThreeD_Player():
         self.progressbar = gtk.ProgressBar()
         self.progressbar.set_size_request(280, 20)
         
-        self.label_bc_time = gtk.Label("00:00 / 00:00")
+        self.label_bc_time = gtk.Label("00:00")
         self.label_bc_time.modify_font(subheader_font)
-
+        self.label_bc_length = gtk.Label("00:00")
+        self.label_bc_length.set_selectable(True)
         
-        self.player_bc = Broadcast_Player(self.label_bc_time, 
-            self.progressbar, self.label_air_warning, self.check_join)
+        self.player_bc = Broadcast_Player(
+            self.label_bc_time, 
+            self.label_bc_length,
+            self.progressbar, 
+            self.label_air_warning, 
+            self.check_join)
 
         btn_inf = gtk.Button("Details")
         btn_rem = gtk.Button("Remove")
@@ -880,6 +889,7 @@ class ThreeD_Player():
         self.label_date.modify_font(subheader_font)
         #time label
         self.label_time = gtk.Label()
+        self.label_time_sec = gtk.Label()
         self.label_time.modify_font(header_font)   
         self.date_and_time()     
 
@@ -964,7 +974,7 @@ class ThreeD_Player():
         btn_hist.connect("clicked", self.show_history)
         btn_skip.connect("clicked", self.skip_track)
         btn_msg_3hr.connect("clicked", self.show_msg_3hr)
-        btn_sch_refresh.connect("clicked", self.refresh_sch)
+        #btn_sch_refresh.connect("clicked", self.refresh_sch)
         btn_sch_now.connect("clicked",self.go_to_now)
         btn_sch_add.connect("clicked",self.add_sch_sel)
         self.btn_pre_play_pause.connect("clicked", self.play_pause_clicked)
@@ -1046,7 +1056,7 @@ class ThreeD_Player():
 
         sw_sch.add(self.treeview_sch)
         hbox_sch.pack_start(label_sch, False)
-        hbox_sch.pack_start(btn_sch_refresh, False)
+        #hbox_sch.pack_start(btn_sch_refresh, False)
         hbox_sch.pack_start(btn_sch_now, False)
         hbox_sch.pack_start(btn_sch_add, False)
         vbox_sch.pack_start(hbox_sch, False)
@@ -1061,7 +1071,10 @@ class ThreeD_Player():
         vbox_pre.pack_start(self.label_pre_time, False)
         vbox_pre.pack_start(sep_pre, False, False, 5)
         vbox_pre.pack_start(self.label_date)
-        vbox_pre.pack_start(self.label_time, False, False, 5)
+        vbox_pre.pack_start(hbox_pre_time)
+
+        hbox_pre_time.pack_start(self.label_time, True, False, 5)
+        hbox_pre_time.pack_start(self.label_time_sec, True, True, 5)
         # vbox_sch.pack_end(vbox_pre, False, False, 0)
 
         vbox_nb.pack_start(vbox_sch, True, True, 0)       
@@ -1075,7 +1088,10 @@ class ThreeD_Player():
         ##vbox_bc.pack_start(btn_testing, False)
         vbox_bc.pack_start(self.progressbar, False)
         hbox_bc_0.pack_start(self.label_bc_time, True)
+        hbox_bc_0.pack_start(self.label_bc_length, False, False, 5)
         hbox_bc_0.pack_end(btn_skip, False)
+        
+        
         hbox_bc_1.pack_start(btn_inf, False)
         hbox_bc_1.pack_start(btn_rem, False)
         hbox_bc_1.pack_start(btn_msg_3hr, False)
@@ -2739,7 +2755,8 @@ class ThreeD_Player():
     def date_and_time(self):
         self.label_date.set_text(time.strftime(("%A %d %B")))
         # uncomment below to show hours and minutes
-        self.label_time.set_text(time.strftime('%H:%M %p'))
+        self.label_time.set_text(time.strftime('%H:%M'))
+        self.label_time_sec.set_text(time.strftime('%S'))
         # Uncoment below to also display seconds
         # self.label_time.set_text(time.strftime('%-I:%M:%S %p'))
         gtk.timeout_add(1000, self.date_and_time)
@@ -2756,7 +2773,8 @@ class ThreeD_Player():
             dict_data = pickle.loads(pickle_data)
             tracktype = dict_data['tracktype'] 
             filepath = self.get_filepath(dict_data, tracktype)
-            return filepath
+            tracklength = dict_data['tracklength']
+            return filepath, tracklength
 
         else:
             print "nothing to play"
@@ -2829,13 +2847,15 @@ class ThreeD_Player():
         '''
         state = self.player_bc_get_state()
         if  state == gst.STATE_NULL:
-            filepath = self.get_bc_filepath()
+            filepath, tracklength = self.get_bc_filepath()
             
             if filepath and os.path.isfile(filepath):                
                 self.label_air_warning("playing")
                 self.player_bc_start(filepath)
                 title = self.get_bc_title()
                 self.progressbar.set_text(title)
+                tracklength = self.convert_time(tracklength)
+                self.label_bc_length.set_text(tracklength)
                 self.log_played_track()                
                 self.delete_top_row()
                 self.update_time_total()
@@ -2846,6 +2866,7 @@ class ThreeD_Player():
                 self.delete_top_row()
                 self.update_time_total()
                 self.check_join()
+                self.label_bc_length.set_text("00:00")
 
         '''
         This is no longer required. It used to
@@ -3092,6 +3113,7 @@ class ThreeD_Player():
     def set_up_sch(self):
         sch_list = self.create_sch_list()
         self.make_sch_treelist(sch_list)
+        gtk.timeout_add(120000, self.set_up_sch)
 
     def refresh_sch(self, widget):
         self.set_up_sch()
@@ -3201,7 +3223,7 @@ class ThreeD_Player():
         search the time column one row at a time for the time string
         programatically select the row with the time string        
         '''    
-        self.refresh_sch(None)
+        #self.refresh_sch(None)
         treeselection = self.treeview_sch.get_selection()
         str_now = self.now_half_hour()
         n = 0
