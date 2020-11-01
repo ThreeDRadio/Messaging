@@ -2715,32 +2715,40 @@ class ThreeD_Player():
         date_now = datetime.datetime.now()
         less3 = datetime.timedelta(0, 10800)
         now_less3 = date_now - less3
-        fqhn = socket.gethostname()
-        hostname = fqhn.split(".")[0]
-        conn = self.pg_connect_msg()
-        cur = conn.cursor()
-        query = "SELECT playlog.when_played, playlog.id_code, messagelist.title FROM playlog JOIN messagelist ON playlog.id_code=messagelist.code WHERE playlog.when_played > '{0}' AND hostname = '{1}' ORDER BY playlog.when_played DESC".format (now_less3, hostname)
-        cur.execute(query)
-        list_msg_3hr = cur.fetchall()
-        cur.close()
-        conn.close()
+        db = 'msglist'
+        search_terms = (now_less3,)
+        query = "SELECT playlog.hostname, playlog.when_played, playlog.id_code, messagelist.title, messagelist.type FROM playlog JOIN messagelist ON playlog.id_code=messagelist.code WHERE playlog.when_played > %s ORDER BY playlog.when_played DESC"
+        result = self.execute_query(db, query, search_terms)
         
-        return list_msg_3hr     
+        return result     
         
     def show_msg_3hr(self, widget):
         dialog = gtk.Dialog("Messages Played in the last 3 Hours", None, 
             gtk.DIALOG_DESTROY_WITH_PARENT | gtk.DIALOG_NO_SEPARATOR, buttons=None)
         #dialog.set_size_request(420, 60)
-        list_msg_3hr = self.get_msg_3hr()
+        result = self.get_msg_3hr()
         sw = gtk.ScrolledWindow()
         sw.set_size_request(360, 340)
         vbox = gtk.VBox(False, 0)
-        for item in list_msg_3hr:
-            str_dt = item[0].strftime("%c")
-            str_code = item[1]
-            str_title = item[2]
+        for item in result:
+            played_on = "Played on: " + item['hostname']
+            when_played = item['when_played']
+            when_played = when_played.strftime("%c")
+            id_code = item['id_code']
+            id_code = "Code: " + id_code
+            title = item['title']
+            msgtype = item['type']
+            msgtype = "Message Type: " + msgtype
             str_blank = ""
-            list_history = [str_dt, str_code, str_title, str_blank]
+            list_history = [
+                when_played, 
+                title, 
+                msgtype, 
+                id_code, 
+                played_on, 
+                str_blank
+                ]
+            
             for item in list_history:
                 label = gtk.Label(item)
                 vbox.pack_start(label, False)
