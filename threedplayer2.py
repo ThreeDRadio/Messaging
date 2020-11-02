@@ -1073,8 +1073,8 @@ class ThreeD_Player():
         vbox_pre.pack_start(self.label_date)
         vbox_pre.pack_start(hbox_pre_time)
 
-        hbox_pre_time.pack_start(self.label_time, True, False, 5)
-        hbox_pre_time.pack_start(self.label_time_sec, True, True, 5)
+        hbox_pre_time.pack_end(self.label_time_sec, False, False, 5)
+        hbox_pre_time.pack_end(self.label_time, False, False, 5)
         # vbox_sch.pack_end(vbox_pre, False, False, 0)
 
         vbox_nb.pack_start(vbox_sch, True, True, 0)       
@@ -2680,7 +2680,7 @@ class ThreeD_Player():
 
             separator = gtk.HSeparator()
             label.set_alignment(0, 5)
-            table_played.attach(separator, 0, 2, n, n + 1, False, True, 5, 0)
+            table_played.attach(separator, 0, 2, n, n + 1, False, True, 5, 10)
             n += 1
 
         #sw.add_with_viewport(table_played)
@@ -2764,7 +2764,7 @@ class ThreeD_Player():
         self.label_date.set_text(time.strftime(("%A %d %B")))
         # uncomment below to show hours and minutes
         self.label_time.set_text(time.strftime('%H:%M'))
-        self.label_time_sec.set_text(time.strftime('%S'))
+        self.label_time_sec.set_text(time.strftime('%S                         .'))
         # Uncoment below to also display seconds
         # self.label_time.set_text(time.strftime('%-I:%M:%S %p'))
         gtk.timeout_add(1000, self.date_and_time)
