@@ -305,8 +305,6 @@ class Preview_Player:
         
     def get_state(self):
         play_state = self.player.get_state(1)[1]
-        #for item in play_state:
-        #    print(item)
         return play_state
         
     #duration updating func
@@ -1673,9 +1671,6 @@ class ThreeD_Player():
             self.clear_search_list()
             int_res = 0
             
-        #print("number of hits")
-        #print(int_res)  
-        
         self.update_result_label(int_res, simple)
                                 
     def query_simple(self, search_terms):
@@ -3184,7 +3179,7 @@ class ThreeD_Player():
         n = 0
         for item in time_list:
             n+=1
-            #(check if there is an entry in item[0] - necessary?)
+
             #check if there is a programme starting at that time
             starttime = item[0]
             for prog in programme_list:
@@ -3201,13 +3196,14 @@ class ThreeD_Player():
                 msg['tracklength'] = msg['duration']
                 msg_start = str(msg['time_date'])[-8:-3]
                 if msg_start==starttime:
+                    self.list_schedule.append(msg)
                     if item[4] == "":
                         item[3] = msg['msg_code']
                         item[4] = msg['title']
 
                     else:
                         time_list.insert(n, ["", "", "", msg['msg_code'], msg['title']])
-                self.list_schedule.append(msg)
+                
         return time_list
         
     def make_sch_treelist(self, sch_list):
@@ -3783,15 +3779,14 @@ class ThreeD_Player():
         '''
         selection = treeview.get_selection()
         model, tree_iter = selection.get_selected()
-        code = model.get_value(tree_iter, 0)
+        code = model.get_value(tree_iter, 3)
 
         dict_data = next(
-            (item for item in self.list_messages if item['code'] == code), 
+            (item for item in self.list_schedule if item['code'] == code), 
             None
             )
-        
-        self.display_message_details(list_schedule)
 
+        self.display_message_details(dict_data)
 
     def show_bc_details(self, w, treeview):
         '''
