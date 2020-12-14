@@ -149,7 +149,7 @@ class Scheduler(gtk.Window):
         day_int = datetime_date.weekday()
         day_of_week = tup_day[day_int]
         if day_int==6:
-            next_day = 0
+            next_day = tup_day[0]
         else:
             next_day = tup_day[day_int+1]
         conn = self.pg_connect()
