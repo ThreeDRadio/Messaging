@@ -14,6 +14,27 @@ import datetime
 from psycopg2 import sql
 import psycopg2.extras
 
+
+# programmes database table details
+'''
+                     Table "public.programmes"
+   Column    |          Type          | Collation | Nullable | Default 
+-------------+------------------------+-----------+----------+---------
+ code        | character varying(6)   |           | not null | 
+ name        | character varying(36)  |           | not null | 
+ day         | character varying(9)   |           | not null | 
+ start       | time without time zone |           |          | 
+ presenters  | character varying(50)  |           |          | 
+ description | character varying(70)  |           |          | 
+Indexes:
+    "programmes_pkey" PRIMARY KEY, btree (code)
+
+'''
+
+
+
+#variables
+
 config = ConfigParser.SafeConfigParser()
 config.read('/usr/local/etc/threedradio.conf')
 
@@ -36,22 +57,68 @@ tup_day = ( "Sunday",
 
 
 class EditProgramme():
-    def __init__(self, prg_info):
+    def __init__(self, programme):
         dialog = gtk.Dialog("Edit Programme", None, 0, (
             gtk.STOCK_SAVE, gtk.RESPONSE_OK, gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL))
         self.programmer = Programmer()
-        self.prg_info = prg_info
+        self.programme = programme
 
         table = gtk.Table(6, 2, False)
 
         gtk.Table(8, 2, False)
         
-        label_code = gtk.Label("Code")
-        label_name = gtk.Label("Name")
-        label_day = gtk.Label("Day")
-        label_start = gtk.Label("Start Time")
-        label_presenters = gtk.Label("Presenters")
-        label_description = gtk.Label("Description")
+        code = programme['code']
+        day = programme['day']
+        start = programme['start']
+        name = programme['name']
+        presenters = programme ['presenters']
+        description = programme['description']
+
+
+        label_ref_code = gtk.Label("Code")
+        table.attach(label_ref_code, 0, 1, 0, 1, False, False, 5, 0)
+        label_code = gtk.Label(code)
+        table.attach(label_code, 1, 2, 0, 1, False, False, 5, 0)
+        
+        label_ref_name = gtk.Label("Name")
+        table.attach(label_ref_name, 0, 1, 1, 2, False, False, 5, 0)
+        entry_name = gtk.Entry()
+        table.attach(entry_name, 1, 2, 1, 2, False, False, 5, 0)
+
+        label_ref_day = gtk.Label("Day")
+        table.attach(label_ref_day, 0, 1, 2, 3, False, False, 5, 0)
+        cb_day = gtk.combo_box_new_text()
+        self.programmer.cb_setup(cb_day)
+        day_int = tup_day.index(day)
+        cb_day.set_active(day_int)
+        table.attach(cb_day, 1, 2, 2, 3, False, False, 5, 0)
+
+        label_ref_start = gtk.Label("Start Time")
+        table.attach(label_ref_start, 0, 1, 3, 4, False, False, 5, 0)
+        cb_start = gtk.combo_box_new_text()
+        timeslot = datetime.time(0, 0)
+        add = datetime.timedelta(minutes=30)
+        finaltime = datetime.time(23, 30)
+        ls_start = []
+        cb_start.append_text('00:00')
+        ls_start.append('00:00')
+
+        while (timeslot != finaltime):
+            timeslot = ((datetime.datetime.combine(datetime.date(1,1,1),timeslot)) + add).time()
+            timestring = timeslot.strftime("%H:%M")                
+            cb_start.append_text(timestring)
+            ls_start.append(timestring)
+
+        start = start.strftime('%H:%M')
+        int_start = ls_start.index(start)
+
+        cb_start.set_active(int_start)
+
+        table.attach(cb_start, 1, 2, 3, 4, False, False, 5, 0)
+
+
+        label_ref_pres = gtk.Label("Presenters")
+        label_ref_desc = gtk.Label("Description")
 
 
         dialog.vbox.pack_start(table, True, True, 0)
@@ -69,7 +136,7 @@ class Programmer():
         '''
         Set up the main window and graphical elements
         '''
-        print("make window")
+        self.day_programmes = []
         window = gtk.Window()
         window.set_title("Programmer")
         window.set_position(gtk.WIN_POS_CENTER)
@@ -83,20 +150,25 @@ class Programmer():
         sw = gtk.ScrolledWindow()
         sw.set_shadow_type(gtk.SHADOW_ETCHED_IN)
         sw.set_policy(gtk.POLICY_NEVER, gtk.POLICY_AUTOMATIC)
-        sw.set_size_request(200, 300)
+        sw.set_size_request(600, 300)
         
         # drop down day selection
         self.cb = gtk.combo_box_new_text()
-        self.cb_setup()
+        self.cb_setup(self.cb)
+
 
         # buttons
         btn_info = gtk.Button(stock=gtk.STOCK_INFO)
+        btn_info.set_tooltip_text("Show information about the selected programme")
         btn_edit = gtk.Button(stock=gtk.STOCK_EDIT)
+        btn_edit.set_tooltip_text("Edit the selected programme")
         btn_add = gtk.Button(stock=gtk.STOCK_ADD)
+        btn_add.set_tooltip_text("Add a new programme")
         btn_del = gtk.Button(stock=gtk.STOCK_DELETE)
+        btn_del.set_tooltip_text("Delete the selected programme")
         
         #make the list
-        store = gtk.ListStore(str, str)         
+        store = gtk.ListStore(str, str, str, str)         
         self.treeview = gtk.TreeView(store)
         self.treeview.set_rules_hint(True)
         self.make_columns(self.treeview)
@@ -124,18 +196,18 @@ class Programmer():
         window.show_all()
 
 
-    def cb_setup(self):
+    def cb_setup(self, cb):
         '''
         Populate the drop down list with days of the week
         Set the active day as today (-6 hours for 6am start of day)
         '''
         for day in tup_day:
-            self.cb.append_text(day)
+            cb.append_text(day)
         now = datetime.datetime.now()
         delta = datetime.timedelta(hours=-6)
         day = now + delta
         index = int(day.strftime("%w"))
-        self.cb.set_active(index)
+        cb.set_active(index)
 
 
     def make_columns(self, treeview):
@@ -147,12 +219,25 @@ class Programmer():
                                      text=0)
         column.set_sort_column_id(0)
         treeview.append_column(column)
-
+        
         # column TWO
-        column = gtk.TreeViewColumn('Title', gtk.CellRendererText(),
-                                    text=1)
-        column.set_sort_column_id(1)        
+        column = gtk.TreeViewColumn('Code', gtk.CellRendererText(),
+                                     text=1)
+        column.set_sort_column_id(1)
         treeview.append_column(column)
+
+        # column THREE
+        column = gtk.TreeViewColumn('Title', gtk.CellRendererText(),
+                                    text=2)
+        column.set_sort_column_id(2)        
+        treeview.append_column(column)
+
+        # column FOUR
+        column = gtk.TreeViewColumn('Presenters', gtk.CellRendererText(),
+                                    text=3)
+        column.set_sort_column_id(3)        
+        treeview.append_column(column)
+
 
     def dialog_info(self, widget):
         '''
@@ -165,8 +250,15 @@ class Programmer():
         Open a dialog window to enable editing of the selected programme
         '''
         print("edit button clicked")
-        prg_info = "stuff"
-        edit_programme = EditProgramme(prg_info)
+        treeselection = self.treeview.get_selection()
+        model, tree_iter = treeselection.get_selected()
+        code = model.get_value(tree_iter, 1)
+        print(code)
+        programme = next(
+            item for item in self.day_programmes if item["code"] == code
+            )
+        
+        edit_programme = EditProgramme(programme)
         edit_programme
         self.show_programmes(self.cb)
 
@@ -192,6 +284,8 @@ class Programmer():
         db, query, search_terms = self.get_programmes_query(day)
         result = self.execute_query(db, query, search_terms)
         programmes = [{k:v for k, v in record.items()} for record in result]
+        for programme in programmes:
+            self.day_programmes.append(programme)
         self.populate_list(programmes)
 
     def get_programmes_query(self, day):
@@ -253,15 +347,19 @@ class Programmer():
             start = programme['start']
             if start >= six_am:
                 start = start.strftime("%H:%M")
+                code = programme['code']
                 name = programme['name']
-                model.append((start, name))
+                presenters = programme['presenters']
+                model.append((start, code, name, presenters))
         
         for programme in programmes:
             start = programme['start']
             if start < six_am:
                 start = start.strftime("%H:%M")
+                code = programme['code']
                 name = programme['name']
-                model.append((start, name))
+                presenters = programme['presenters']
+                model.append((start, code, name, presenters))
 
     def pg_connect_msg(self):
         '''
