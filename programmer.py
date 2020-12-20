@@ -82,7 +82,8 @@ class EditProgramme():
         
         label_ref_name = gtk.Label("Name")
         table.attach(label_ref_name, 0, 1, 1, 2, False, False, 5, 0)
-        entry_name = gtk.Entry()
+        entry_name = gtk.Entry(36)
+        entry_name.set_text(name)
         table.attach(entry_name, 1, 2, 1, 2, False, False, 5, 0)
 
         label_ref_day = gtk.Label("Day")
@@ -111,15 +112,23 @@ class EditProgramme():
 
         start = start.strftime('%H:%M')
         int_start = ls_start.index(start)
-
         cb_start.set_active(int_start)
-
         table.attach(cb_start, 1, 2, 3, 4, False, False, 5, 0)
 
-
         label_ref_pres = gtk.Label("Presenters")
-        label_ref_desc = gtk.Label("Description")
+        table.attach(label_ref_pres, 0, 1, 4, 5, False, False, 5, 0)
+        entry_pres = gtk.Entry(50)
+        entry_pres.set_text(presenters)
+        table.attach(entry_pres, 1, 2, 4, 5, False, False, 5, 0)
 
+        label_ref_desc = gtk.Label("Description")
+        table.attach(label_ref_desc, 0, 1, 5, 6, False, False, 5, 0)
+        entry_desc = gtk.Entry(70)
+        entry_desc.set_editable(True)
+        if description:
+            entry_desc.set_text(description)
+        
+        table.attach(entry_desc, 1, 2, 5, 6, False, False, 5, 0)
 
         dialog.vbox.pack_start(table, True, True, 0)
         dialog.show_all()
@@ -129,7 +138,8 @@ class EditProgramme():
         dialog.destroy()
 
     def update_programme(self, widget):
-        print self.prg_info
+        print ("add changes to the database")
+        
 
 class Programmer():
     def __init__(self):
