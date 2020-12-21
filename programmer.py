@@ -57,6 +57,27 @@ tup_day = ( "Sunday",
             "Saturday")
 
 
+class ProgrammeInfo():
+    def __init__(self, programme):
+        dialog = gtk.Dialog("Edit Programme", None, 
+        0, 
+        (gtk.STOCK_OK, gtk.RESPONSE_CANCEL))
+        self.programme = programme
+
+class DeleteProgramme():
+    def __init__(self, programme):
+        dialog = gtk.Dialog("Edit Programme", None, 
+        0, 
+        (gtk.STOCK_SAVE, gtk.RESPONSE_OK, gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL))
+        self.programme = programme
+
+class AddProgramme():
+    def __init__(self, programme):
+        dialog = gtk.Dialog("Edit Programme", None, 
+        0, 
+        (gtk.STOCK_SAVE, gtk.RESPONSE_OK, gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL))
+        self.programme = programme
+
 class EditProgramme():
     def __init__(self, programme):
         dialog = gtk.Dialog("Edit Programme", None, 
