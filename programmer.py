@@ -11,6 +11,7 @@ import time
 import pango
 import ConfigParser
 import datetime
+import time
 from psycopg2 import sql
 import psycopg2.extras
 
@@ -82,53 +83,53 @@ class EditProgramme():
         
         label_ref_name = gtk.Label("Name")
         table.attach(label_ref_name, 0, 1, 1, 2, False, False, 5, 0)
-        entry_name = gtk.Entry(36)
-        entry_name.set_text(name)
-        table.attach(entry_name, 1, 2, 1, 2, False, False, 5, 0)
+        self.entry_name = gtk.Entry(36)
+        self.entry_name.set_text(name)
+        table.attach(self.entry_name, 1, 2, 1, 2, False, False, 5, 0)
 
         label_ref_day = gtk.Label("Day")
         table.attach(label_ref_day, 0, 1, 2, 3, False, False, 5, 0)
-        cb_day = gtk.combo_box_new_text()
-        self.programmer.cb_setup(cb_day)
+        self.cb_day = gtk.combo_box_new_text()
+        self.programmer.cb_setup(self.cb_day)
         day_int = tup_day.index(day)
-        cb_day.set_active(day_int)
-        table.attach(cb_day, 1, 2, 2, 3, False, False, 5, 0)
+        self.cb_day.set_active(day_int)
+        table.attach(self.cb_day, 1, 2, 2, 3, False, False, 5, 0)
 
         label_ref_start = gtk.Label("Start Time")
         table.attach(label_ref_start, 0, 1, 3, 4, False, False, 5, 0)
-        cb_start = gtk.combo_box_new_text()
+        self.cb_start = gtk.combo_box_new_text()
         timeslot = datetime.time(0, 0)
         add = datetime.timedelta(minutes=30)
         finaltime = datetime.time(23, 30)
         ls_start = []
-        cb_start.append_text('00:00')
+        self.cb_start.append_text('00:00')
         ls_start.append('00:00')
 
         while (timeslot != finaltime):
             timeslot = ((datetime.datetime.combine(datetime.date(1,1,1),timeslot)) + add).time()
             timestring = timeslot.strftime("%H:%M")                
-            cb_start.append_text(timestring)
+            self.cb_start.append_text(timestring)
             ls_start.append(timestring)
 
         start = start.strftime('%H:%M')
         int_start = ls_start.index(start)
-        cb_start.set_active(int_start)
-        table.attach(cb_start, 1, 2, 3, 4, False, False, 5, 0)
+        self.cb_start.set_active(int_start)
+        table.attach(self.cb_start, 1, 2, 3, 4, False, False, 5, 0)
 
         label_ref_pres = gtk.Label("Presenters")
         table.attach(label_ref_pres, 0, 1, 4, 5, False, False, 5, 0)
-        entry_pres = gtk.Entry(50)
-        entry_pres.set_text(presenters)
-        table.attach(entry_pres, 1, 2, 4, 5, False, False, 5, 0)
+        self.entry_pres = gtk.Entry(50)
+        self.entry_pres.set_text(presenters)
+        table.attach(self.entry_pres, 1, 2, 4, 5, False, False, 5, 0)
 
         label_ref_desc = gtk.Label("Description")
         table.attach(label_ref_desc, 0, 1, 5, 6, False, False, 5, 0)
-        entry_desc = gtk.Entry(70)
-        entry_desc.set_editable(True)
+        self.entry_desc = gtk.Entry(70)
+        self.entry_desc.set_editable(True)
         if description:
-            entry_desc.set_text(description)
+            self.entry_desc.set_text(description)
         
-        table.attach(entry_desc, 1, 2, 5, 6, False, False, 5, 0)
+        table.attach(self.entry_desc, 1, 2, 5, 6, False, False, 5, 0)
 
         dialog.vbox.pack_start(table, True, True, 0)
         dialog.show_all()
@@ -138,8 +139,82 @@ class EditProgramme():
         dialog.destroy()
 
     def update_programme(self, widget):
-        print ("add changes to the database")
+        '''
+        actions to update the database when the SAVE button is clicked
+        '''
+        dict_update = self.collect_modified_values()
+        self.update_database(dict_update)
+
+    def collect_modified_values(self):
+        '''
+        get values from modifiable items and compare with original values
+        return dictionary of modified values
+        '''
+        code = self.programme["code"]
+        dict_update = {"code": code}
         
+        name = self.entry_name.get_text()
+        if name != self.programme["name"]:
+            dict_update["name"] = name
+
+        day = self.cb_day.get_active_text()
+        if day != self.programme["day"]:
+            dict_update["day"] = day
+
+        start = self.cb_start.get_active_text()
+        start = datetime.datetime.strptime(start, "%H:%M")
+        orig_start = self.programme["start"]
+        if start != orig_start:
+            dict_update["start"] = start
+        
+        presenters = self.entry_pres.get_text()
+        if presenters != self.programme["presenters"]:
+            dict_update["presenters"] = presenters
+
+        description = self.entry_desc.get_text()
+        orig_description = self.programme["description"]
+        if not orig_description:
+            orig_description = ""
+        if description != orig_description:
+            dict_update["description"] = description
+
+        return dict_update
+
+    def update_database(self, dict_update):
+        '''
+        create and execute the query to update the programme details in the database
+        '''
+        updates = dict_update.keys()
+        updates.remove('code')
+        changes = len(updates)
+
+        if changes == 0:
+            return
+
+        elif changes == 1:
+            update = updates[0]
+            query = sql.SQL("UPDATE programmes set {} = {} WHERE code = {}").format(
+                sql.Identifier(update),
+                sql.Placeholder(name=update),
+                sql.Placeholder(name="code")
+                )
+
+        else:
+            query = sql.SQL("UPDATE programmes SET ({}) = ({}) WHERE code = {}").format(
+                sql.SQL(', ').join(map(sql.Identifier, updates)),
+                sql.SQL(', ').join(map(sql.Placeholder, updates)),
+                sql.Placeholder(name="code")
+                )
+    
+        conn = self.programmer.pg_connect_msg()
+        cur = conn.cursor()
+        #print(query.as_string(conn))
+        cur.execute(query, dict_update)
+        conn.commit()
+        cur.close()
+        conn.close()
+
+       
 
 class Programmer():
     def __init__(self):
@@ -186,7 +261,7 @@ class Programmer():
         self.show_programmes(self.cb)
 
         # connect signals and events
-        self.cb.connect("changed", self.show_programmes)
+        self.cb.connect("popdown", self.show_programmes)
         btn_info.connect("clicked", self.dialog_info)
         btn_edit.connect("clicked", self.dialog_edit)
         btn_add.connect("clicked", self.dialog_add)
@@ -290,12 +365,15 @@ class Programmer():
         Get the selected day of the week from the drop down list
         Populate the programme list from the selected day
         '''
+        self.day_programmes = []
         day = widget.get_active_text()
         db, query, search_terms = self.get_programmes_query(day)
-        result = self.execute_query(db, query, search_terms)
-        programmes = [{k:v for k, v in record.items()} for record in result]
+        programmes = self.execute_query(db, query, search_terms)
+        #programmes = [{k:v for k, v in record.items()} for record in programmes]
+
         for programme in programmes:
             self.day_programmes.append(programme)
+
         self.populate_list(programmes)
 
     def get_programmes_query(self, day):
@@ -351,6 +429,7 @@ class Programmer():
         Populate the list store with programme details
         '''
         model = self.treeview.get_model()
+        model.clear()
         six_am = datetime.time(6)
 
         for programme in programmes:
