@@ -59,9 +59,9 @@ tup_day = ( "Sunday",
 
 class EditProgramme():
     def __init__(self, programme):
-        dialog = gtk.Dialog("Edit Programme", None, 0, (
-            gtk.STOCK_SAVE, gtk.RESPONSE_OK, gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL))
-        self.programmer = Programmer()
+        dialog = gtk.Dialog("Edit Programme", None, 
+        0, 
+        (gtk.STOCK_SAVE, gtk.RESPONSE_OK, gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL))
         self.programme = programme
 
         table = gtk.Table(6, 2, False)
@@ -90,7 +90,7 @@ class EditProgramme():
         label_ref_day = gtk.Label("Day")
         table.attach(label_ref_day, 0, 1, 2, 3, False, False, 5, 0)
         self.cb_day = gtk.combo_box_new_text()
-        self.programmer.cb_setup(self.cb_day)
+        self.cb_setup(self.cb_day)
         day_int = tup_day.index(day)
         self.cb_day.set_active(day_int)
         table.attach(self.cb_day, 1, 2, 2, 3, False, False, 5, 0)
@@ -138,6 +138,19 @@ class EditProgramme():
             self.update_programme(None)       
         dialog.destroy()
 
+    def cb_setup(self, cb):
+        '''
+        Populate the drop down list with days of the week
+        Set the active day as today (-6 hours for 6am start of day)
+        '''
+        for day in tup_day:
+            cb.append_text(day)
+        now = datetime.datetime.now()
+        delta = datetime.timedelta(hours=-6)
+        day = now + delta
+        index = int(day.strftime("%w"))
+        cb.set_active(index)
+
     def update_programme(self, widget):
         '''
         actions to update the database when the SAVE button is clicked
@@ -180,6 +193,17 @@ class EditProgramme():
 
         return dict_update
 
+    def pg_connect_msg(self):
+        '''
+        connect to the message database
+        '''
+        #connection variables
+        conn_string = 'dbname={0} user={1} host={2} password={3}'.format (
+            pg_msg_database, pg_user, pg_server, pg_password)
+        conn = psycopg2.connect(conn_string)
+        #cur = conn.cursor()
+        return conn
+
     def update_database(self, dict_update):
         '''
         create and execute the query to update the programme details in the database
@@ -206,7 +230,7 @@ class EditProgramme():
                 sql.Placeholder(name="code")
                 )
     
-        conn = self.programmer.pg_connect_msg()
+        conn = self.pg_connect_msg()
         cur = conn.cursor()
         #print(query.as_string(conn))
         cur.execute(query, dict_update)
@@ -261,7 +285,7 @@ class Programmer():
         self.show_programmes(self.cb)
 
         # connect signals and events
-        self.cb.connect("popdown", self.show_programmes)
+        self.cb.connect("changed", self.show_programmes)
         btn_info.connect("clicked", self.dialog_info)
         btn_edit.connect("clicked", self.dialog_edit)
         btn_add.connect("clicked", self.dialog_add)
@@ -334,11 +358,9 @@ class Programmer():
         '''
         Open a dialog window to enable editing of the selected programme
         '''
-        print("edit button clicked")
         treeselection = self.treeview.get_selection()
         model, tree_iter = treeselection.get_selected()
         code = model.get_value(tree_iter, 1)
-        print(code)
         programme = next(
             item for item in self.day_programmes if item["code"] == code
             )
