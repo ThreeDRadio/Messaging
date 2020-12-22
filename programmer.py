@@ -246,9 +246,9 @@ class AddProgramme():
         dialog.show_all()
         response = dialog.run()
         if response == gtk.RESPONSE_OK:
-            result = self.add_programme(None)
-            if result:
-                dialog.destroy()       
+            self.add_programme(None)
+            
+        dialog.destroy()       
         
 
     def add_programme(self, widget):
@@ -257,10 +257,11 @@ class AddProgramme():
         when the SAVE button is clicked
         '''
         dict_add = self.collect_values()
-        dict_check = self.check_values(dict_add)
-        if dict_check:
-            str_error = self.create_error(dict_add)
-            self.error_dialog(str_error)
+        list_check = self.check_values(dict_add)
+        if list_check:
+            str_error = self.create_error(dict_add, list_check)
+            common = Common()
+            common.error_dialog(str_error)
             return False
         
         else:
@@ -302,20 +303,21 @@ class AddProgramme():
         code = dict_add['code']        
         day = dict_add['day']
         start = dict_add['start']
+        start = start.strftime("%H:%M")
 
         search_terms = (code, day, start)
-        query = ("SELECT * FROM programmes WHERE code=%s OR (day=%s AND start=%s")
+        query = "SELECT * FROM programmes WHERE code=%s OR (day=%s AND start=%s)"
 
         common = Common()
         conn = common.pg_connect_msg()
 
         dict_cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-        dict_cur.execute(query, (search_terms))
-        dict_check = dict_cur.fetchall()
+        dict_cur.execute(query, search_terms)
+        list_check = dict_cur.fetchall()
         dict_cur.close()
         conn.close() 
 
-        return dict_check
+        return list_check
 
     def add_to_database(self, dict_add):
         '''
@@ -338,12 +340,27 @@ class AddProgramme():
         cur.close()
         conn.close()       
 
-def create_error(self, dict_check):
-    '''
-    use the results from the checking to display conflict of start time or code
-    '''
+    def create_error(self, dict_add, list_check):
+        '''
+        use the results from the checking to display conflict of start time or code
+        '''
+        str_error = ""
+        code = dict_add['code']
+        day = dict_add['day']
+        start = dict_add['start']
+        start = start.strftime("%H:%M")
 
-    
+
+        for item in list_check:
+            item_start = (item['start']).strftime("%H:%M")
+            name = item['name']
+            if item['code'] == code:
+                str_error = "{} has code {}\n".format(name, code)
+
+            if item_start == start and item['day'] == day:
+                str_error = "{} starts at {} on {}".format(name, start, day)
+
+        return str_error
 
 class EditProgramme():
     def __init__(self, programme):
