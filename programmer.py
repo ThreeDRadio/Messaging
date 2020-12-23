@@ -197,7 +197,7 @@ class AddProgramme():
         
         label_ref_code = gtk.Label("Code")
         table.attach(label_ref_code, 0, 1, 0, 1, False, False, 5, 0)
-        self.entry_code = gtk.Entry()
+        self.entry_code = gtk.Entry(6)
         table.attach(self.entry_code, 1, 2, 0, 1, False, False, 5, 0)
         
         label_ref_name = gtk.Label("Name")
@@ -262,13 +262,10 @@ class AddProgramme():
             str_error = self.create_error(dict_add, list_check)
             common = Common()
             common.error_dialog(str_error)
-            return False
         
         else:
             self.add_to_database(dict_add)
-            return True
             
-
     def collect_values(self):
         '''
         get values from modifiable items and compare with original values
@@ -344,21 +341,36 @@ class AddProgramme():
         '''
         use the results from the checking to display conflict of start time or code
         '''
-        str_error = ""
+        fail_error = "Failed due to conflicts:\n \n"
         code = dict_add['code']
         day = dict_add['day']
         start = dict_add['start']
         start = start.strftime("%H:%M")
+        name = dict_add['name']
+        presenters = dict_add['presenters']
+
+        if not name or not code or not presenters:
+            str_error = "You must include a Name, ID Code and Presenters for the programme"
 
 
         for item in list_check:
-            item_start = (item['start']).strftime("%H:%M")
-            name = item['name']
+            check_name = item['name']
+            item_start = item['start'].strftime("%H:%M")
             if item['code'] == code:
-                str_error = "{} has code {}\n".format(name, code)
+                code_error = "{} has ID Code {}".format(check_name, code)
+                print(code_error)
+            
+            else: 
+                code_error = ""
 
             if item_start == start and item['day'] == day:
-                str_error = "{} starts at {} on {}".format(name, start, day)
+                start_error = "{} starts at {} on {}".format(check_name, start, day)
+                print(start_error)
+
+            else: 
+                start_error = ""
+
+        str_error = fail_error + code_error + "\n" + start_error
 
         return str_error
 
@@ -449,9 +461,11 @@ class EditProgramme():
         actions to update the database when the SAVE button is clicked
         '''
         dict_update = self.collect_modified_values()
-        check_result = self.check_values(dict_update)
-        if check_result:
-            print("fail")        
+        list_check = self.check_values(dict_update)
+        if list_check:
+            str_error = self.create_error(dict_update, list_check)
+            common = Common()
+            common.error_dialog(str_error)      
         self.update_database(dict_update)
 
     def collect_modified_values(self):
@@ -489,14 +503,61 @@ class EditProgramme():
 
         return dict_update
 
-    def check_values(self, dict_add):
+    def check_values(self, dict_update):
         '''
         Check that code and day/start are not in use
         '''
+        if 'day' in dict_update or 'start' in dict_update:
+           
+            day = self.cb_day.get_active_text()
+            start = self.cb_start.get_active_text()
 
-        print("work in progress")
-        return None
+            search_terms = (day, start)
+            query = "SELECT * FROM programmes WHERE day=%s AND start=%s"
 
+            common = Common()
+            conn = common.pg_connect_msg()
+
+            dict_cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            dict_cur.execute(query, search_terms)
+            list_check = dict_cur.fetchall()
+            dict_cur.close()
+            conn.close() 
+        
+        else:
+            list_check = None
+
+        return list_check        
+
+    def create_error(self, dict_update, list_check):
+        '''
+        use the results from the checking to display conflict of start time
+        '''
+        fail_error = "Failed due to conflicts:\n \n"
+
+        day = self.cb_day.get_active_text()
+        start = self.cb_start.get_active_text()
+        name = self.entry_name.get_text()
+        presenters = self.entry_pres.get_text()        
+
+
+        if not name or presenters:
+            str_error = "You must include a Name, ID Code and Presenters for the programme"
+
+
+        for item in list_check:
+            check_name = item['name']
+            item_start = item['start'].strftime("%H:%M")
+
+            if item_start == start and item['day'] == day:
+                start_error = "{} starts at {} on {}".format(check_name, start, day)
+                print(start_error)
+
+            else: 
+                start_error = ""
+
+        str_error = fail_error + start_error
+        return str_error
 
 
     def update_database(self, dict_update):
