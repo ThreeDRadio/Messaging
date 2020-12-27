@@ -81,9 +81,9 @@ class Common():
         index = int(day.strftime("%w"))
         cb.set_active(index)
 
-    def error_dialog(self, str_error):
+    def message_dialog(self, message_type, str_error):
         messagedialog = gtk.MessageDialog(None, 0, 
-                    gtk.MESSAGE_ERROR, gtk.BUTTONS_CLOSE, 
+                    message_type, gtk.BUTTONS_CLOSE, 
                     str_error)
         messagedialog.run()
         messagedialog.destroy()  
@@ -257,14 +257,20 @@ class AddProgramme():
         when the SAVE button is clicked
         '''
         dict_add = self.collect_values()
-        list_check = self.check_values(dict_add)
-        if list_check:
-            str_error = self.create_error(dict_add, list_check)
-            common = Common()
-            common.error_dialog(str_error)
-        
+        if not dict_add:
+            return
         else:
-            self.add_to_database(dict_add)
+            list_check = self.check_values(dict_add)
+            if not list_check:
+                self.add_to_database(dict_add)
+            
+            else:
+                (message_type, str_message) = self.create_message(dict_add, list_check)
+                common = Common()
+                common.message_dialog(message_type, str_message)
+
+                if message_type == gtk.MESSAGE_WARNING:
+                    self.add_to_database(dict_add)
             
     def collect_values(self):
         '''
@@ -291,7 +297,18 @@ class AddProgramme():
         if description:
             dict_add["description"] = description
 
-        return dict_add
+
+        if not name or not code or not presenters:
+            error_message = "Failed to add programme:\n \n"
+            str_empty = "You must include a Name, ID Code and Presenters for the programme"
+            str_message = error_message + str_empty
+            message_type = gtk.MESSAGE_ERROR
+
+            common = Common()
+            common.message_dialog(message_type, str_message)
+            return None
+        else:
+            return dict_add
 
     def check_values(self, dict_add):
         '''
@@ -315,6 +332,41 @@ class AddProgramme():
         conn.close() 
 
         return list_check
+   
+
+    def create_message(self, dict_add, list_check):
+        '''
+        use the results from the checking to display conflict of start time or code
+        '''
+        error_message = "Failed to add programme:\n \n"
+        warning_message = "Warning: \n \n"
+
+        code = dict_add['code']
+        day = dict_add['day']
+        start = dict_add['start']
+        start = start.strftime("%H:%M")
+
+        for item in list_check:
+            check_name = item['name']
+
+            if item['code'] == code:
+                dup_error = "Duplicate ID Code \n"
+                code_error = "{} has ID Code {}".format(check_name, code)
+                str_message = error_message + dup_error + code_error
+                message_type = gtk.MESSAGE_ERROR
+                return (message_type, str_message)
+        
+        for item in list_check:
+            check_name = item['name']
+            item_start = item['start'].strftime("%H:%M")
+
+            if item_start == start and item['day'] == day:
+                start_message = "{} starts at {} on {}".format(check_name, start, day)
+                str_message = warning_message + start_message
+                message_type = gtk.MESSAGE_WARNING
+                return (message_type, str_message)
+
+
 
     def add_to_database(self, dict_add):
         '''
@@ -335,44 +387,7 @@ class AddProgramme():
         cur.execute(query, dict_add)
         conn.commit()
         cur.close()
-        conn.close()       
-
-    def create_error(self, dict_add, list_check):
-        '''
-        use the results from the checking to display conflict of start time or code
-        '''
-        fail_error = "Failed due to conflicts:\n \n"
-        code = dict_add['code']
-        day = dict_add['day']
-        start = dict_add['start']
-        start = start.strftime("%H:%M")
-        name = dict_add['name']
-        presenters = dict_add['presenters']
-
-        if not name or not code or not presenters:
-            str_error = "You must include a Name, ID Code and Presenters for the programme"
-
-
-        for item in list_check:
-            check_name = item['name']
-            item_start = item['start'].strftime("%H:%M")
-            if item['code'] == code:
-                code_error = "{} has ID Code {}".format(check_name, code)
-                print(code_error)
-            
-            else: 
-                code_error = ""
-
-            if item_start == start and item['day'] == day:
-                start_error = "{} starts at {} on {}".format(check_name, start, day)
-                print(start_error)
-
-            else: 
-                start_error = ""
-
-        str_error = fail_error + code_error + "\n" + start_error
-
-        return str_error
+        conn.close()    
 
 class EditProgramme():
     def __init__(self, programme):
@@ -464,8 +479,9 @@ class EditProgramme():
         list_check = self.check_values(dict_update)
         if list_check:
             str_error = self.create_error(dict_update, list_check)
+            message_type = gtk.MESSAGE_WARNING
             common = Common()
-            common.error_dialog(str_error)      
+            common.message_dialog(message_type, str_error)      
         self.update_database(dict_update)
 
     def collect_modified_values(self):
