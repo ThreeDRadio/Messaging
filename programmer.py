@@ -469,20 +469,21 @@ class EditProgramme():
             self.update_programme(None)       
         dialog.destroy()
 
-
-
     def update_programme(self, widget):
         '''
         actions to update the database when the SAVE button is clicked
         '''
         dict_update = self.collect_modified_values()
-        list_check = self.check_values(dict_update)
-        if list_check:
-            str_error = self.create_error(dict_update, list_check)
-            message_type = gtk.MESSAGE_WARNING
-            common = Common()
-            common.message_dialog(message_type, str_error)      
-        self.update_database(dict_update)
+        if not dict_update:
+            return
+        else:
+            list_check = self.check_values(dict_update)
+            if list_check:
+                message_type, str_message  = self.create_message(dict_update, list_check)
+                message_type = gtk.MESSAGE_WARNING
+                common = Common()
+                common.message_dialog(message_type, str_message)      
+            self.update_database(dict_update)
 
     def collect_modified_values(self):
         '''
@@ -517,7 +518,18 @@ class EditProgramme():
         if description != orig_description:
             dict_update["description"] = description
 
-        return dict_update
+        if not name or not presenters:
+            error_message = "Failed to update the programme:\n \n"
+            str_empty = "You must include the Name and the Presenters"
+            str_message = error_message + str_empty
+            message_type = gtk.MESSAGE_ERROR
+
+            common = Common()
+            common.message_dialog(message_type, str_message)
+            return None
+        else:
+            return dict_update
+
 
     def check_values(self, dict_update):
         '''
@@ -545,35 +557,27 @@ class EditProgramme():
 
         return list_check        
 
-    def create_error(self, dict_update, list_check):
+    def create_message(self, dict_update, list_check):
         '''
         use the results from the checking to display conflict of start time
         '''
-        fail_error = "Failed due to conflicts:\n \n"
+        warn_error = "Warning: \n \n"
 
         day = self.cb_day.get_active_text()
         start = self.cb_start.get_active_text()
-        name = self.entry_name.get_text()
-        presenters = self.entry_pres.get_text()        
-
-
-        if not name or presenters:
-            str_error = "You must include a Name, ID Code and Presenters for the programme"
-
+      
 
         for item in list_check:
             check_name = item['name']
             item_start = item['start'].strftime("%H:%M")
 
             if item_start == start and item['day'] == day:
-                start_error = "{} starts at {} on {}".format(check_name, start, day)
-                print(start_error)
-
-            else: 
-                start_error = ""
-
-        str_error = fail_error + start_error
-        return str_error
+                message_type = gtk.MESSAGE_WARNING
+                start_message = "{} starts at {} on {}".format(check_name, start, day)
+                str_message = warn_error + start_message
+                return (message_type, str_message)
+      
+        return None
 
 
     def update_database(self, dict_update):
