@@ -4023,6 +4023,23 @@ Please inform the message production team of this error."
         table_details.attach(label_album, 1, 2, n, n + 1, False, False, 5, 0)
 
         n += 1
+        
+        if not is_cd:
+            if "tracklength" in dict_data:
+                label_detail_tracklength = gtk.Label()
+                label_detail_tracklength.set_text("Track Length: ")
+                label_detail_tracklength.set_alignment(0, 0.5)
+                table_details.attach(label_detail_tracklength, 0, 1, n, n + 1, False, False, 5, 0)
+                
+                label_tracklength = gtk.Label()
+                tracklength = dict_data['tracklength']
+                str_tracklength = self.convert_time(tracklength)
+                label_tracklength.set_text(str_tracklength)
+                label_tracklength.set_selectable(True)
+                label_tracklength.set_alignment(0, 0.5)
+                table_details.attach(label_tracklength, 1, 2, n, n + 1, False, False, 5, 0)
+            
+                n += 1
 
         label_detail_local = gtk.Label()
         label_detail_local.set_alignment(0, 0.5)
@@ -4053,23 +4070,6 @@ Please inform the message production team of this error."
         table_details.attach(label_female, 1, 2, n, n + 1, False, False, 5, 0)
         
         n += 1
-        
-        if not is_cd:
-            if "tracklength" in dict_data:
-                label_detail_tracklength = gtk.Label()
-                label_detail_tracklength.set_text("Track Length: ")
-                label_detail_tracklength.set_alignment(0, 0.5)
-                table_details.attach(label_detail_tracklength, 0, 1, n, n + 1, False, False, 5, 0)
-                
-                label_tracklength = gtk.Label()
-                tracklength = dict_data['tracklength']
-                str_tracklength = self.convert_time(tracklength)
-                label_tracklength.set_text(str_tracklength)
-                label_tracklength.set_selectable(True)
-                label_tracklength.set_alignment(0, 0.5)
-                table_details.attach(label_tracklength, 1, 2, n, n + 1, False, False, 5, 0)
-            
-                n += 1
 
         label_detail_demo = gtk.Label()
         label_detail_demo.set_alignment(0, 0.5)
@@ -4087,7 +4087,6 @@ Please inform the message production team of this error."
         table_details.attach(label_demo, 1, 2, n, n + 1, False, False, 5, 0)
         
         n += 1
-        
 
         if 'compliation' in dict_data:
             label_detail_compilation = gtk.Label()
