@@ -108,7 +108,7 @@ subheader_font_2 = pango.FontDescription("Sans Bold 11")
             
 #get variables from config file
 config = ConfigParser.SafeConfigParser()
-config.read('/usr/local/etc/threedradio-dev.conf')
+config.read('/usr/local/etc/threedradio.conf')
 
 #the serialwatch script to be run as a subprocess
 # may not be required, serialwatch now running as a service.
