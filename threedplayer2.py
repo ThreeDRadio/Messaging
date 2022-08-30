@@ -900,7 +900,9 @@ class ThreeD_Player():
         self.label_cdn_prg = gtk.Label("The next show starts in:")
         self.label_cdn_prg.set_tooltip_text("")
         self.label_cdn_time = gtk.Label()
-        self.update_countdown(0)
+        now = datetime.datetime.now()
+        start_time = now.time()
+        self.update_countdown(start_time)
 
         ### dnd and connections ###
         self.treeview_cat.enable_model_drag_source(gtk.gdk.BUTTON1_MASK, 
@@ -3465,7 +3467,7 @@ class ThreeD_Player():
         self.player_pre.set_place_in_file(self.hscale_pre.get_value())
         
         
-    def update_countdown(self, seconds_remaining):
+    def update_countdown(self, start_time):
         '''
         if the time on the label is less than 1
         query the database to get the next show
@@ -3473,24 +3475,23 @@ class ThreeD_Player():
         else:
         subtract 1 from the time remaining
         '''
-        if seconds_remaining < 1:
-            now = datetime.datetime.now()
+        now = datetime.datetime.now()
+        start_datetime = datetime.datetime.combine(datetime.date.today(), start_time)
+        delta_time_remaining = start_datetime - now
+        seconds_remaining = delta_time_remaining.total_seconds()
+               
+        if seconds_remaining < 1 or not start_time:
             name, start_time = self.get_next_show(now)
             self.label_cdn_prg.set_tooltip_text(name)
-            start_datetime = datetime.datetime.combine(datetime.date.today(), start_time)
-            delta_time_remaining = start_datetime - now
-            seconds_remaining = delta_time_remaining.total_seconds()
-            time_left = str((delta_time_remaining)).split(".")[0]
-            self.label_cdn_time.set_text(time_left)
             self.label_cdn_time.set_tooltip_text(name)
-            seconds_remaining = seconds_remaining -1  
+        
+        delta_time_remaining = start_datetime - now
+        seconds_remaining = delta_time_remaining.total_seconds()
+        #time_left = str((delta_time_remaining)).split(".")[0]
+        time_left = str((delta_time_remaining + datetime.timedelta(0,1))).split(".")[0]
+        self.label_cdn_time.set_text(time_left)
 
-        else:
-            delta_time_remaining = datetime.timedelta(seconds=seconds_remaining)
-            time_left = str((delta_time_remaining + datetime.timedelta(0,1))).split(".")[0]
-            self.label_cdn_time.set_text(time_left)
-            seconds_remaining = seconds_remaining -1  
-        gtk.timeout_add(1000, self.update_countdown, seconds_remaining)
+        gtk.timeout_add(1000, self.update_countdown, start_time)
         
     def get_next_show(self,now):
         
