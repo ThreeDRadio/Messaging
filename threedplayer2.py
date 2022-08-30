@@ -622,10 +622,13 @@ class ThreeD_Player():
         # vbox for preview section
         vbox_pre = gtk.VBox(False, 2)  
         # hbox for preview player buttons
-        hbox_pre_btn = gtk.HBox(False, 0)   
+        hbox_pre_btn = gtk.HBox(False, 0)
+        # hbox for track detail
+        hbox_pre_play = gtk.HBox(False, 0)  
         # hbox for the clock
-        hbox_pre_time = gtk.HBox(False, 0)     
-
+        hbox_pre_time = gtk.HBox(False, 0)
+        # hbox for the countdown
+        hbox_pre_cdn = gtk.HBox(False, 0)
         
         ### ----------------Message List Section---------------- ###   
              
@@ -848,9 +851,10 @@ class ThreeD_Player():
         ### ----------------Preview Section---------------- ###
 
         #preview Label
-        label_pre = gtk.Label("Preview")
-        label_pre.modify_font(header_font)
-        label_pre.set_size_request(200, 30)
+        label_pre = gtk.Label(" Preview")
+        label_pre.modify_font(subheader_font)
+        label_pre.set_alignment(0, 0.5)
+        #label_pre.set_size_request(200, 30)
         # preview player buttons
         self.btn_pre_play_pause = gtk.Button()
         self.btn_pre_play_pause.set_image(self.image_play)
@@ -860,7 +864,7 @@ class ThreeD_Player():
         #Label of track to preview
         self.str_dur="00:00"
         self.label_pre_play = gtk.Label()
-        self.label_pre_play.set_width_chars(30)
+        self.label_pre_play.set_width_chars(20)
         self.label_pre_play.set_tooltip_text("")
         self.label_pre_time = gtk.Label("00:00 / 00:00")        
         #create a dictionary for holding details of message to play
@@ -884,13 +888,19 @@ class ThreeD_Player():
         ### Date and Time ###
         # date label
         self.label_date = gtk.Label()
-        self.label_date.modify_font(subheader_font)
+        self.label_date.modify_font(subheader_font_2)
         #time label
         self.label_time = gtk.Label()
+        self.label_time.modify_font(subheader_font_2)
         self.label_time_sec = gtk.Label()
-        self.label_time.modify_font(header_font)   
+        self.label_time_sec.modify_font(subheader_font_2)
         self.date_and_time()     
 
+        # countdown labels
+        self.label_cdn_prg = gtk.Label("The next show starts in:")
+        self.label_cdn_prg.set_tooltip_text("")
+        self.label_cdn_time = gtk.Label()
+        self.update_countdown(0)
 
         ### dnd and connections ###
         self.treeview_cat.enable_model_drag_source(gtk.gdk.BUTTON1_MASK, 
@@ -1060,21 +1070,27 @@ class ThreeD_Player():
         vbox_sch.pack_start(hbox_sch, False)
         vbox_sch.pack_start(sw_sch, True, True, 0)
         
-        hbox_pre_btn.pack_start(self.btn_pre_play_pause, False)
-        hbox_pre_btn.pack_start(btn_pre_stop, False)
-        hbox_pre_btn.pack_start(self.label_pre_play, False, False, 5)         
-        vbox_pre.pack_start(label_pre, False)
+        hbox_pre_btn.pack_start(self.btn_pre_play_pause, False, False, 5)
+        hbox_pre_btn.pack_start(btn_pre_stop, False, False, 5)
+        hbox_pre_btn.pack_end(self.hscale_pre, True, True, 5)         
+        vbox_pre.pack_start(label_pre, False, True, 5)
         vbox_pre.pack_start(hbox_pre_btn, False, False, 0)
-        vbox_pre.pack_start(self.hscale_pre, True, True, 0)
-        vbox_pre.pack_start(self.label_pre_time, False)
-        vbox_pre.pack_start(sep_pre, False, False, 5)
-        vbox_pre.pack_start(self.label_date)
-        vbox_pre.pack_start(hbox_pre_time)
-
-        hbox_pre_time.pack_end(self.label_time_sec, False, False, 5)
-        hbox_pre_time.pack_end(self.label_time, False, False, 5)
+        hbox_pre_play.pack_start(self.label_pre_play, False, False, 5)
+        hbox_pre_play.pack_end(self.label_pre_time, False, False, 5)
+        vbox_pre.pack_start(hbox_pre_play, False, False, 5)
+        vbox_pre.pack_start(sep_pre, False, False, 0)
+        
+        vbox_pre.pack_start(hbox_pre_time, False, False, 5)
+        hbox_pre_time.pack_start(self.label_date, False, True, 5)
+        hbox_pre_time.pack_start(self.label_time, False, True, 5)
+        hbox_pre_time.pack_start(self.label_time_sec)
+        hbox_pre_cdn.pack_start(self.label_cdn_prg, False, True, 5)
+        hbox_pre_cdn.pack_start(self.label_cdn_time, False, True, 5)
+        vbox_pre.pack_start(hbox_pre_cdn, False, False, 5)        
         # vbox_sch.pack_end(vbox_pre, False, False, 0)
-
+        
+        
+        
         vbox_nb.pack_start(vbox_sch, True, True, 0)       
         vbox_nb.pack_start(notebook, False, False, 5)
         notebook.append_page(hbox_msg, label_msg_btn)
@@ -1103,7 +1119,7 @@ class ThreeD_Player():
         #vbox_bc.pack_start(hbox_bc_2, True)
         vbox_bc.pack_start(sw_bc, True)
         vbox_bc.pack_start(hbox_bc_time, False)
-        vbox_bc.pack_start(sep_bc_pre, False, False, 10)
+        vbox_bc.pack_start(sep_bc_pre, False, False, 0)
         vbox_bc.pack_end(vbox_pre, False, False, 0)
 
         
@@ -2758,10 +2774,10 @@ class ThreeD_Player():
     def date_and_time(self):
         self.label_date.set_text(time.strftime(("%A %d %B")))
         # uncomment below to show hours and minutes
-        self.label_time.set_text(time.strftime('%H:%M'))
-        self.label_time_sec.set_text(time.strftime('%S                         .'))
+        self.label_time.set_text(time.strftime("%H:%M:%S"))
+        #self.label_time_sec.set_text(time.strftime(':%S'))
         # Uncoment below to also display seconds
-        # self.label_time.set_text(time.strftime('%-I:%M:%S %p'))
+        #self.label_time.set_text(time.strftime('%-I:%M:%S %p'))
         gtk.timeout_add(1000, self.date_and_time)
 
     def get_top_track(self):
@@ -3447,6 +3463,61 @@ class ThreeD_Player():
     def on_seek_changed(self, widget, param):
         self.player_pre.set_updateable_progress(True)
         self.player_pre.set_place_in_file(self.hscale_pre.get_value())
+        
+        
+    def update_countdown(self, seconds_remaining):
+        '''
+        if the time on the label is less than 1
+        query the database to get the next show
+        set the labels with show name and time remaining
+        else:
+        subtract 1 from the time remaining
+        '''
+        if seconds_remaining < 1:
+            now = datetime.datetime.now()
+            name, start_time = self.get_next_show(now)
+            self.label_cdn_prg.set_tooltip_text(name)
+            start_datetime = datetime.datetime.combine(datetime.date.today(), start_time)
+            delta_time_remaining = start_datetime - now
+            seconds_remaining = delta_time_remaining.total_seconds()
+            time_left = str((delta_time_remaining)).split(".")[0]
+            self.label_cdn_time.set_text(time_left)
+            self.label_cdn_time.set_tooltip_text(name)
+            seconds_remaining = seconds_remaining -1  
+
+        else:
+            delta_time_remaining = datetime.timedelta(seconds=seconds_remaining)
+            time_left = str((delta_time_remaining + datetime.timedelta(0,1))).split(".")[0]
+            self.label_cdn_time.set_text(time_left)
+            seconds_remaining = seconds_remaining -1  
+        gtk.timeout_add(1000, self.update_countdown, seconds_remaining)
+        
+    def get_next_show(self,now):
+        
+        day = now.strftime('%A')
+        now_time = now.strftime("%H:%M:%S")
+
+        result = self.query_next_show(day, now_time)
+
+        if not result:
+            now = now + timedelta(day=1)
+            day = now.strftime('%A')
+            result = query_next_show(day, now_time)
+
+        print(result)
+        return result
+
+    def query_next_show(self, day, now_time):
+        # select name, start from programmes where day='Saturday' and start > '14:04' order by start limit 1;
+
+        conn = self.pg_connect_msg()
+        cur = conn.cursor()
+        query = "SELECT name, start FROM programmes WHERE day=%s AND start > %s ORDER BY start LIMIT 1"
+        cur.execute(query, (day, now_time)) 
+        result = cur.fetchone()
+        cur.close()
+        conn.close()
+        return result
 
     #common functions
 
