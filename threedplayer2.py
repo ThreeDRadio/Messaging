@@ -894,7 +894,6 @@ class ThreeD_Player():
         self.label_time.modify_font(subheader_font_2)
         self.label_time_sec = gtk.Label()
         self.label_time_sec.modify_font(subheader_font_2)
-        self.date_and_time()     
 
         # countdown labels
         self.label_cdn_prg = gtk.Label("The next show starts in:")
@@ -2773,15 +2772,6 @@ class ThreeD_Player():
         dialog.run()
         dialog.destroy()        
 
-    def date_and_time(self):
-        self.label_date.set_text(time.strftime(("%A %d %B")))
-        # uncomment below to show hours and minutes
-        self.label_time.set_text(time.strftime("%H:%M:%S"))
-        #self.label_time_sec.set_text(time.strftime(':%S'))
-        # Uncoment below to also display seconds
-        #self.label_time.set_text(time.strftime('%-I:%M:%S %p'))
-        gtk.timeout_add(1000, self.date_and_time)
-
     def get_top_track(self):
         model = self.treeview_bc.get_model()
         tree_iter = model.get_iter_first()
@@ -3490,6 +3480,13 @@ class ThreeD_Player():
         #time_left = str((delta_time_remaining)).split(".")[0]
         time_left = str((delta_time_remaining + datetime.timedelta(0,1))).split(".")[0]
         self.label_cdn_time.set_text(time_left)
+        
+        self.label_date.set_text(time.strftime(("%A %d %B")))
+        # uncomment below to show hours and minutes
+        self.label_time.set_text(time.strftime("%H:%M:%S"))
+        #self.label_time_sec.set_text(time.strftime(':%S'))
+        # Uncoment below to also display seconds
+        #self.label_time.set_text(time.strftime('%-I:%M:%S %p'))
 
         gtk.timeout_add(1000, self.update_countdown, start_time)
         
