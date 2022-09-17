@@ -892,8 +892,6 @@ class ThreeD_Player():
         #time label
         self.label_time = gtk.Label()
         self.label_time.modify_font(subheader_font_2)
-        self.label_time_sec = gtk.Label()
-        self.label_time_sec.modify_font(subheader_font_2)
 
         # countdown labels
         self.label_cdn_prg = gtk.Label("The next show starts in:")
@@ -1084,7 +1082,6 @@ class ThreeD_Player():
         vbox_pre.pack_start(hbox_pre_time, False, False, 5)
         hbox_pre_time.pack_start(self.label_date, False, True, 5)
         hbox_pre_time.pack_start(self.label_time, False, True, 5)
-        hbox_pre_time.pack_start(self.label_time_sec)
         hbox_pre_cdn.pack_start(self.label_cdn_prg, False, True, 5)
         hbox_pre_cdn.pack_start(self.label_cdn_time, False, True, 5)
         vbox_pre.pack_start(hbox_pre_cdn, False, False, 5)        
@@ -3471,24 +3468,37 @@ class ThreeD_Player():
         seconds_remaining = delta_time_remaining.total_seconds()
                
         if seconds_remaining < 1 or not start_time:
-            name, start_time = self.get_next_show(now)
-            self.label_cdn_prg.set_tooltip_text(name)
-            self.label_cdn_time.set_tooltip_text(name)
+            try:
+                name, start_time = self.get_next_show(now)
+                self.label_cdn_prg.set_tooltip_text(name)
+                self.label_cdn_time.set_tooltip_text(name)
+            except Exception as e: 
+                print("failed to query database for next program")
+                print(e)
+                self.label_date.set_text("Database error")
+                self.label_time.set_text("")
+                self.label_cdn_time.set_text("")
         
-        delta_time_remaining = start_datetime - now
-        seconds_remaining = delta_time_remaining.total_seconds()
-        #time_left = str((delta_time_remaining)).split(".")[0]
-        time_left = str((delta_time_remaining + datetime.timedelta(0,1))).split(".")[0]
-        self.label_cdn_time.set_text(time_left)
+        try:            
+            delta_time_remaining = start_datetime - now
+            seconds_remaining = delta_time_remaining.total_seconds()
+            time_left = str((delta_time_remaining + datetime.timedelta(0,1))).split(".")[0]
+            self.label_cdn_time.set_text(time_left)
+            
+            self.label_date.set_text(now.strftime(("%A %d %B")))
+            # uncomment below to show hours minutes and seconds
+            self.label_time.set_text(now.strftime("%H:%M:%S"))
+            # Uncoment below to also display seconds and AM/PM
+            #self.label_time.set_text(now.strftime('%-I:%M:%S %p'))
+        except Exception as e:
+                print("failed to set the time or countdown")
+                print(e)
+                self.label_date.set_text("Time/date error")
+                self.label_time.set_text("")
+                self.label_cdn_time.set_text("")
         
-        self.label_date.set_text(time.strftime(("%A %d %B")))
-        # uncomment below to show hours and minutes
-        self.label_time.set_text(time.strftime("%H:%M:%S"))
-        #self.label_time_sec.set_text(time.strftime(':%S'))
-        # Uncoment below to also display seconds
-        #self.label_time.set_text(time.strftime('%-I:%M:%S %p'))
-
-        gtk.timeout_add(1000, self.update_countdown, start_time)
+        finally:
+            gtk.timeout_add(1000, self.update_countdown, start_time)
         
     def get_next_show(self,now):
         
