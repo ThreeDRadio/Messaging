@@ -3510,6 +3510,7 @@ class ThreeD_Player():
         if not result:
             now = now + datetime.timedelta(days=1)
             day = now.strftime('%A')
+            now_time = '00:00:00'
             result = query_next_show(day, now_time)
 
         print(result)
