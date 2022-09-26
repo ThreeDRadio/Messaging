@@ -898,8 +898,8 @@ class ThreeD_Player():
         self.label_cdn_prg.set_tooltip_text("")
         self.label_cdn_time = gtk.Label()
         now = datetime.datetime.now()
-        start_time = now.time()
-        self.update_countdown(start_time)
+        next_start_datetime = datetime.datetime.now()
+        self.update_countdown(next_start_datetime)
 
         ### dnd and connections ###
         self.treeview_cat.enable_model_drag_source(gtk.gdk.BUTTON1_MASK, 
@@ -3454,7 +3454,7 @@ class ThreeD_Player():
         self.player_pre.set_place_in_file(self.hscale_pre.get_value())
         
         
-    def update_countdown(self, start_time):
+    def update_countdown(self, next_start_datetime):
         '''
         if the time on the label is less than 1
         query the database to get the next show
@@ -3463,25 +3463,39 @@ class ThreeD_Player():
         subtract 1 from the time remaining
         '''
         now = datetime.datetime.now()
-        start_datetime = datetime.datetime.combine(datetime.date.today(), start_time)
-        delta_time_remaining = start_datetime - now
-        seconds_remaining = delta_time_remaining.total_seconds()
-               
-        if seconds_remaining < 1 or not start_time:
+        difference = next_start_datetime - now
+        one_second = datetime.timedelta(seconds = 1)
+        one_day = datetime.timedelta(days = 1)
+        
+        if difference < one_second:
             try:
-                name, start_time = self.get_next_show(now)
+                #query the database
+                result = self.get_next_show(now)
+                if result:
+                    name, start_time = result
+                    next_start_datetime = datetime.datetime.combine(now, start_time)
+                
+                else:
+                    tomorrow = now + one_day
+                    midnight = datetime.time(0,0,0)
+                    tomorrow_midnight = datetime.datetime.combine(tomorrow, midnight)
+                    result = self.get_next_show(tomorrow_midnight)
+                    name, start_time = result
+                    next_start_datetime = datetime.datetime.combine(tomorrow, start_time)
+
                 self.label_cdn_prg.set_tooltip_text(name)
-                self.label_cdn_time.set_tooltip_text(name)
+                
             except Exception as e: 
-                print("failed to query database for next program")
+                print("failed to query database for next program start time")
                 print(e)
                 self.label_date.set_text("Database error")
                 self.label_time.set_text("")
                 self.label_cdn_time.set_text("")
-        
+                
         try:            
-            delta_time_remaining = start_datetime - now
-            seconds_remaining = delta_time_remaining.total_seconds()
+            delta_time_remaining = next_start_datetime - now
+            print("time remaining is:")          
+            print(str((delta_time_remaining + datetime.timedelta(0,1))))
             time_left = str((delta_time_remaining + datetime.timedelta(0,1))).split(".")[0]
             self.label_cdn_time.set_text(time_left)
             
@@ -3498,7 +3512,7 @@ class ThreeD_Player():
                 self.label_cdn_time.set_text("")
         
         finally:
-            gtk.timeout_add(1000, self.update_countdown, start_time)
+            gtk.timeout_add(1000, self.update_countdown, next_start_datetime)
         
     def get_next_show(self,now):
         
@@ -3507,13 +3521,9 @@ class ThreeD_Player():
 
         result = self.query_next_show(day, now_time)
 
-        if not result:
-            now = now + datetime.timedelta(days=1)
-            day = now.strftime('%A')
-            now_time = '00:00:00'
-            result = query_next_show(day, now_time)
-
+        print("Query database for the next show")
         print(result)
+
         return result
 
     def query_next_show(self, day, now_time):
@@ -3521,7 +3531,7 @@ class ThreeD_Player():
 
         conn = self.pg_connect_msg()
         cur = conn.cursor()
-        query = "SELECT name, start FROM programmes WHERE day=%s AND start > %s ORDER BY start LIMIT 1"
+        query = "SELECT name, start FROM programmes WHERE day=%s AND start >= %s ORDER BY start ASC LIMIT 1"
         cur.execute(query, (day, now_time)) 
         result = cur.fetchone()
         cur.close()
