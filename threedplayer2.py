@@ -45,10 +45,6 @@ from operator import itemgetter
 from lxml import etree
 from psycopg2 import sql
 
-# disable global beep setting
-settings = Gtk.Settings()
-settings.set_property('gtk-bell-error', False)
-
 #other variables
 sfx = ".p3d"
 sfx_old = ".p3d"
