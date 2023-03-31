@@ -1,30 +1,41 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 '''
 listmaker
 search for tracks and add them to a list which can be saved
-as an xspf file
+for loading into the studio player
 '''
 import datetime
 import pickle
-import threading
-import thread
 import os
 import time
-import ConfigParser
+import base64
+import threading
+import configparser
 
-import pygtk
-import gtk
-import gobject
-import pango
+import gi
+gi.require_version('Gtk', '3.0')
+gi.require_version('Gst', '1.0')
+gi.require_version('Gdk', '3.0')
+from gi.repository import Gtk
+from gi.repository import Gst
+from gi.repository import Gdk
+from gi.repository import GLib
+from gi.repository import GObject
+from gi.repository import Pango
+
 import psycopg2
 import psycopg2.extras
-import gst
-import pygst
-from lxml import etree
 from psycopg2 import sql
+import json
+from lxml import etree
+import pydub
+
+import player
+from player import Player
+
 
 #get variables from config file
-config = ConfigParser.SafeConfigParser()
+config = configparser.ConfigParser()
 config.read('/usr/local/etc/threedradio.conf')
 
 dir_pl3d = config.get('Paths', 'dir_pl3d')
@@ -67,9 +78,9 @@ select_items = (
     "cdtrack.tracktitle",
     "cdtrack.trackartist",
     "cdtrack.tracklength",
-    "cdcomment.comment"
+    "cdcomment.comment",
+    "cdcomment.createwho"
     )
-
 
 order_results = {
             "Newest Albums First": (("year", "DESC"), ("id", "DESC")),
@@ -79,378 +90,307 @@ order_results = {
             "Most Recently Added": (("createwhen", "DESC"), ("id", "DESC"))
 }
 
-class Preview_Player:
-    '''
-    adapted from Benny Malev's DamnSimplePlayer
-    '''
-    def __init__(self, time_label, hscale, reset_playbutton):
-        self.player = gst.element_factory_make("playbin", "player")
-        fakesink = gst.element_factory_make("fakesink", "fakesink")
-        sink_pre = gst.element_factory_make("alsasink", "preview_sink")
-        #sink_pre.set_property("device", "preview")
-        self.player.set_property("video-sink", fakesink)
-        self.player.set_property("audio-sink", sink_pre)
-        bus = self.player.get_bus()
-        bus.add_signal_watch()
-        bus.connect("message", self.on_message)
-        
-        self.time_format = gst.Format(gst.FORMAT_TIME)
-        
-        #set statusbar ref.
-        self.time_label = time_label
-        self.hscale = hscale
-        self.reset_playbutton = reset_playbutton
-        
-        #to hold place on change event in gui
-        self.place_in_file = None
-        self.progress_updatable = True
-       
-    def set_place_in_file(self,place_in_file):
-        self.place_in_file = place_in_file
-    
-    def start(self, filepath):
-        self.player.set_property("uri", "file://" + filepath)
-        self.player.set_state(gst.STATE_PLAYING)
-        self.play_thread_id = thread.start_new_thread(self.play_thread, ())
-             
-    def stop(self):
-        self.play_thread_id = None
-        self.player.set_state(gst.STATE_NULL)
-        self.reset_components()
-        
-    def pause(self):
-        self.player.set_state(gst.STATE_PAUSED)
-                        
-    def on_message(self, bus, message):
-        t = message.type
-        if t == gst.MESSAGE_EOS:
-            self.play_thread_id = None
-            self.player.set_state(gst.STATE_NULL)
-            self.reset_components()
-                        
-        elif t == gst.MESSAGE_ERROR:
-            self.play_thread_id = None
-            self.player.set_state(gst.STATE_NULL)
-            err, debug = message.parse_error()
-            print ("Error: {0}").format (err, debug)
-            self.reset_components()
+class SpinnerDialog(Gtk.Dialog):
 
-    def convert_ns(self, time_int):
-        s,ns = divmod(time_int, 1000000000)
-        m,s = divmod(s, 60)
+    def __init__(self, parent):
+        Gtk.Dialog.__init__(self, "Spinner Dialog", parent, 0)
+        self.set_default_size(150, 100)
 
-        if m < 60:
-            str_dur = "%02i:%02i" %(m,s)
-            return str_dur
-        else:
-            h,m = divmod(m, 60)
-            str_dur = "%i:%02i:%02i" %(h,m,s)
-            return str_dur
-        
-    def get_duration(self):
-        dur_int = self.player.query_duration(self.time_format, None)[0]
-        return self.convert_ns(dur_int)
-        
-    def set_updateable_progress(self,flag):
-        self.progress_updatable = flag 
-        
-    def rewind_callback(self):
-        pos_int = self.player.query_position(self.time_format, None)[0]
-        seek_ns = pos_int - (10 * 1000000000)
-        self.player.seek_simple(self.time_format, gst.SEEK_FLAG_FLUSH, seek_ns)
-        
-    def forward_callback(self):
-        pos_int = self.player.query_position(self.time_format, None)[0]
-        seek_ns = pos_int + (10 * 1000000000)
-        self.player.seek_simple(self.time_format, gst.SEEK_FLAG_FLUSH, seek_ns)
-        
-    def get_state(self):
-        play_state = self.player.get_state(1)[1]
-        return play_state
-        
-    #duration updating func
-    def play_thread(self):
-        play_thread_id = self.play_thread_id
-        
-        while play_thread_id == self.play_thread_id:
-            try:
-                time.sleep(0.2)
-                dur_int = self.player.query_duration(self.time_format, None)[0]
-                dur_str = self.convert_ns(dur_int)
+        # Create a box for the dialog contents
+        box = self.get_content_area()
 
-                self.duration_time = dur_int / 1000000000
-                
-                gtk.gdk.threads_enter()
-                self.time_label.set_text("00:00 / " + dur_str)
-                
-                #set hscale
-                self.hscale.set_range(0,self.duration_time)
-                
-                gtk.gdk.threads_leave()
-                break
-            except:
-                pass
-                
-        time.sleep(0.2)
-        while play_thread_id == self.play_thread_id:
-            
-            #update position
-            if self.place_in_file:
-                self.player.seek_simple(self.time_format ,gst.SEEK_FLAG_FLUSH | gst.SEEK_FLAG_KEY_UNIT | gst.SEEK_TYPE_SET ,self.place_in_file*1000000000)
-                self.place_in_file = None
-                #let the seek enough time to complete
-                time.sleep(0.1)
-            
-            pos_int = self.player.query_position(self.time_format, None)[0]
-            pos_str = self.convert_ns(pos_int)
-            
-            self.current_time = pos_int / 1000000000
-            
-            if play_thread_id == self.play_thread_id:
-                gtk.gdk.threads_enter()
-                
-                if self.progress_updatable:
-                    #update hscale
-                    self.hscale.set_value(self.current_time)
-                
-                self.time_label.set_text(pos_str + " / " + dur_str)
-                
-                gtk.gdk.threads_leave()
-            time.sleep(1)
-    def reset_components(self):  
-        self.time_label.set_text("00:00 / 00:00")
-        self.hscale.set_value(0)
-        self.reset_playbutton()
+        # Add a spinner widget to the box
+        spinner = Gtk.Spinner()
+        spinner.start()
+        box.add(spinner)
+        label = Gtk.Label(label="Please wait")
+        box.add(label)
+
+        self.show_all()
 
 class List_Maker():
     
     def delete_event(self, widget, event, data=None):
-        return False
-
+        '''
+        Check for confirmation or need to save before application quits.
+        '''
+        if self.changed:
+            response = self.save_change()
+            if response == Gtk.ResponseType.ACCEPT:
+                self.save(None)
+                return False
+            elif response == Gtk.ResponseType.REJECT:
+                return False
+            elif response == Gtk.ResponseType.CANCEL:
+                return True
+            
+        else:
+            response = self.confirm_close()
+        
+        return response
+        
     def destroy(self, widget, data=None):
-        gtk.main_quit()
+        Gtk.main_quit()
 
     def main(self):
         '''defines the layout of the graphical interface
            and the events connected to the widgets
         '''
-        self.window = gtk.Window(gtk.WINDOW_TOPLEVEL) 
-        self.window.set_position(gtk.WIN_POS_CENTER)
+        super().__init__()
+        self.window = Gtk.Window() 
+        self.window.set_position(Gtk.WindowPosition.CENTER)
         filepath_logo = dir_img + logo
         self.window.set_icon_from_file(filepath_logo)
-        #self.window.set_resizable(False)
-        self.window.set_size_request(1100, 800)
         self.window.set_title("Listmaker")
         
         
         ###   create containers - boxes and scrolled windows  ###        
-        #hpane to hold playlist and search panes
-        #hpane = gtk.HPaned()
         # hbox for music catalogue
-        hbox_cat = gtk.HBox(False, 5)
-        # vbox for catalogue search
-        vbox_cat_search = gtk.VBox(False, 5)
-        # table for music catalogue search
-        table_cat = gtk.Table(20, 2, False)
-
-        # hbox for catalogue order selection
-        hbox_cat_order = gtk.HBox(False, 5)
+        hbox_cat = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
+        hbox_cat.set_margin_top(5)
         
-        # hbox for catalogue maximum result limit selection
-        hbox_cat_max = gtk.HBox(False, 5)
+        # vbox for catalogue search
+        vbox_cat_search = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+        vbox_cat_search.set_margin_left(5)
+        # table for music catalogue search
+        grid_cat = Gtk.Grid(hexpand=False, vexpand=False)
+        grid_cat.set_valign(Gtk.Align.FILL)
+        grid_cat.set_margin_top(margin=5)                                                                            
+        grid_cat.set_margin_end(margin=5)                                                                            
+        grid_cat.set_margin_bottom(margin=5)                                                                         
+        grid_cat.set_margin_start(margin=5)                                                                          
+        grid_cat.set_row_spacing(spacing=5)                                                                          
+        grid_cat.set_column_spacing(spacing=5)
+        grid_cat.set_row_homogeneous(False)
+        grid_cat.set_column_homogeneous(False)
         
         # vbox for catalogue list
-        vbox_cat_lst = gtk.VBox(False, 0)
+        vbox_cat_lst = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+        vbox_cat_lst.set_halign(Gtk.Align.FILL)
+        vbox_cat_lst.set_valign(Gtk.Align.FILL)
         # scrolled window for catalogue list treeview
-        self.sw_cat_lst = gtk.ScrolledWindow()
-        self.sw_cat_lst.set_shadow_type(gtk.SHADOW_ETCHED_IN)
-        self.sw_cat_lst.set_policy(gtk.POLICY_NEVER, gtk.POLICY_AUTOMATIC) 
+        self.sw_cat_lst = Gtk.ScrolledWindow()
+        self.sw_cat_lst.set_shadow_type(Gtk.ShadowType.ETCHED_IN)
+        self.sw_cat_lst.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC) 
+        self.sw_cat_lst.set_propagate_natural_width(True)
         
         # hbox for preview player buttons
-        hbox_pre_btn = gtk.HBox(False, 0)  
-        hbox_pre_btn.set_size_request(280, 30)
+        hbox_pre_btn = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
         # vbox for playlist
-        vbox_pl = gtk.VBox(False, 5)
+        vbox_pl = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+        vbox_pl.set_margin_right(5)
         # hbox for list option buttons in the playlist
-        hbox_pl = gtk.HBox(False, 0)        
+        hbox_pl = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
         
         # scrolled holder for the playlist treelist
-        sw_pl = gtk.ScrolledWindow()
-        sw_pl.set_shadow_type(gtk.SHADOW_ETCHED_IN)
-        sw_pl.set_policy(gtk.POLICY_NEVER, gtk.POLICY_AUTOMATIC)
+        sw_pl = Gtk.ScrolledWindow()
+        sw_pl.set_shadow_type(Gtk.ShadowType.ETCHED_IN)
+        sw_pl.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
  
         # hbox for Total Time 
-        hbox_pl_time = gtk.HBox(False, 0)    
-        hbox_pl_time.set_size_request(280, 30)
-
-
-        ### Styles ###
-
-        header_font = pango.FontDescription("Sans Bold 18")
-        subheader_font = pango.FontDescription("Sans Bold 14")
-        subheader_font_1 = pango.FontDescription("Sans Bold 12")
-        subheader_font_2 = pango.FontDescription("Sans Bold 11")  
-
+        hbox_pl_time = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
 
         ### ----------------Music Catalogue Search ---------------- ###
         
-        label_search = gtk.Label(" Music Catalogue ")
-        label_search.modify_font(header_font)        
-        sep_cat_0 = gtk.HSeparator()
-        label_cat_simple = gtk.Label("Simple Search")
-        label_cat_simple.modify_font(subheader_font_1)
-        self.entry_cat_simple = gtk.Entry(50)
-        btn_cat_simple = gtk.Button("Search")
-        btn_cat_simple.set_tooltip_text("Simple search")
-        btn_cat_simple.set_size_request(80, 30)
-        self.label_result_simple = gtk.Label()
-        self.label_result_simple.set_size_request(80, 40)
-        sep_cat_1 = gtk.HSeparator()
-        label_search = gtk.Label("Advanced Search")
-        label_search.modify_font(subheader_font_1)
-        label_search_artist = gtk.Label("Artist")
-        self.entry_search_artist = gtk.Entry(50)
-        label_search_album = gtk.Label("Album")
-        self.entry_search_album = gtk.Entry(50)
-        label_search_track = gtk.Label("Track")
-        self.entry_search_track = gtk.Entry(50)
-        label_search_cmpy = gtk.Label("Company")
-        self.entry_search_cmpy = gtk.Entry(50)
-        label_search_genre = gtk.Label("Genre")
-        self.entry_search_genre = gtk.Entry(50)        
-        label_search_com = gtk.Label("Comments")
-        self.entry_search_com = gtk.Entry(50)
-        label_search_cpa = gtk.Label("Country")
-        self.entry_search_cpa = gtk.Entry(50)
-        label_search_year = gtk.Label("Release year")
-        self.entry_search_year = gtk.Entry(4)
-        label_search_creator = gtk.Label("Added by")
-        self.cb_search_creator = gtk.combo_box_new_text()
-        style = gtk.rc_parse_string('''
-            style "my-style" { GtkComboBox::appears-as-list = 1 }
-            widget "*.mycombo" style "my-style"
-        ''')
+        label_search = Gtk.Label(label="")
+        label_search.set_markup("<span font='Sans Bold 14'> Search </span>")
+        label_search.set_halign(Gtk.Align.START)
+        label_search_artist = Gtk.Label(label="Artist")
+        label_search_artist.set_halign(Gtk.Align.END)
+        self.entry_search_artist = Gtk.Entry()
+        label_search_album = Gtk.Label(label="Album")
+        label_search_album.set_halign(Gtk.Align.END)
+        self.entry_search_album = Gtk.Entry()
+        label_search_track = Gtk.Label(label="Track")
+        label_search_track.set_halign(Gtk.Align.END)
+        self.entry_search_track = Gtk.Entry()
+        label_search_cmpy = Gtk.Label(label="Company")
+        label_search_cmpy.set_halign(Gtk.Align.END)
+        self.entry_search_cmpy = Gtk.Entry()
+        label_search_genre = Gtk.Label(label="Genre")
+        label_search_genre.set_halign(Gtk.Align.END)
+        self.entry_search_genre = Gtk.Entry()        
+        label_search_com = Gtk.Label(label="Comments")
+        label_search_com.set_halign(Gtk.Align.END)
+        self.entry_search_com = Gtk.Entry()
+        label_search_cpa = Gtk.Label(label="Country")
+        label_search_cpa.set_halign(Gtk.Align.END)
+        self.entry_search_cpa = Gtk.Entry()
+        label_search_year = Gtk.Label(label="Release year")
+        label_search_year.set_halign(Gtk.Align.END)
+        self.entry_search_year = Gtk.Entry()
+        self.entry_search_year.set_max_length(4)
+        label_search_creator = Gtk.Label(label="Added by")
+        label_search_creator.set_halign(Gtk.Align.END)
+        self.cb_search_creator = Gtk.ComboBoxText()
+        self.cb_search_creator = Gtk.ComboBoxText()
         self.cb_search_creator.set_name('mycombo')
-        self.cb_search_creator.set_style(style)
         self.dict_creator = self.get_dict_creator()
         self.cb_creator_add(self.dict_creator)        
-        self.chk_search_comp = gtk.CheckButton("Compilation", True)
-        self.chk_search_demo = gtk.CheckButton("Demo", True)
-        self.chk_search_local = gtk.CheckButton("Local", True)       
-        self.chk_search_fem = gtk.CheckButton("Female", True)
-        self.chk_search_nr = gtk.CheckButton("New Entries", True)
+        self.chk_search_comp = Gtk.CheckButton.new_with_label("Compilation")
+        self.chk_search_comp.set_active(False)
+        self.chk_search_aus = Gtk.CheckButton.new_with_label("Australian")
+        self.chk_search_aus.set_active(False)        
+        self.chk_search_demo = Gtk.CheckButton.new_with_label("Demo")
+        self.chk_search_demo.set_active(False)
+        self.chk_search_local = Gtk.CheckButton.new_with_label("Local")
+        self.chk_search_local.set_active(False)       
+        self.chk_search_fem = Gtk.CheckButton.new_with_label("Female")
+        self.chk_search_fem.set_active(False)
+        self.chk_search_nr = Gtk.CheckButton.new_with_label("New Entries")
+        self.chk_search_nr.set_active(False)
         
-        label_search_order = gtk.Label("Order by")
-        self.cb_search_order = gtk.combo_box_new_text()
+        label_search_order = Gtk.Label(label="Order by")
+        label_search_order.set_halign(Gtk.Align.END)
+        self.cb_search_order = Gtk.ComboBoxText()
         self.cb_order_add()
 
-        label_search_max = gtk.Label("Maximum Results")
-        adjustment_max = gtk.Adjustment(query_limit, 1.0, 10000.0, 50.0, 500.0, 0.0)
-        self.spin_search_max = gtk.SpinButton(adjustment_max, 0, 0)
-          
-        
-        btn_search = gtk.Button("Search")
-        self.label_search_result = gtk.Label()
-        self.label_search_result.set_size_request(80, 40)
+        label_search_max = Gtk.Label(label="Maximum Results")
+        label_search_max.set_halign(Gtk.Align.END)
+        query_limit = config.getint('Listmaker', 'query_limit')
+        adjustment_max = Gtk.Adjustment(
+            value=query_limit, 
+            lower=1, 
+            upper=10000, 
+            step_increment=50, 
+            page_increment=500, 
+            page_size=50)
+        self.spin_search_max = Gtk.SpinButton()
+        self.spin_search_max.set_adjustment(adjustment_max)
+        self.spin_search_max.set_value(query_limit)
+       
+        btn_search = Gtk.Button(label="Search")
+        btn_search.set_halign(Gtk.Align.START)
+        self.label_search_result = Gtk.Label()
 
         ### ----------- Search Results Section -----------###
 
-        label_results = gtk.Label("Search Results")
-        label_results.modify_font(subheader_font_1)
-        #label_results.set_size_request(80, 30)
-
+        label_results = Gtk.Label()
+        label_results.set_halign(Gtk.Align.START)
+        label_results.set_markup("<span font='Sans Bold 14'> Results </span>")
+        
         #make the list
-        self.store_cat = gtk.TreeStore(str ,str ,str, str, str)
-        self.treeview_cat = gtk.TreeView(self.store_cat)
-        self.treeview_cat.set_rules_hint(True)
+        self.store_cat = Gtk.TreeStore(str ,str ,str, str, str)
+        self.treeview_cat = Gtk.TreeView(model = self.store_cat)
+        self.treeview_cat.set_name("cat")
+        self.treeview_cat.set_halign(Gtk.Align.FILL)
         treeselection_cat = self.treeview_cat.get_selection()
         self.add_cat_columns(self.treeview_cat)
+        self.dict_results = {}
         
+        # button to expand or collapse all in treeview
+        button_expand = Gtk.Button(
+            label="Expand All",
+            halign=Gtk.Align.START
+            )
+        button_expand.connect("clicked", self.expand_collapse)
         
         ### ------------ Preview Section ------------  ###
-        
-        ### images for buttons
-        self.image_play = gtk.Image()
-        self.image_play.set_from_stock(gtk.STOCK_MEDIA_PLAY, gtk.ICON_SIZE_BUTTON)
-        self.image_play.set_name("play")
-        self.image_pause = gtk.Image()
-        self.image_pause.set_from_stock(gtk.STOCK_MEDIA_PAUSE, gtk.ICON_SIZE_BUTTON)
-        self.image_pause.set_name("pause")
-        image_stop = gtk.Image()
-        image_stop.set_from_stock(gtk.STOCK_MEDIA_STOP, gtk.ICON_SIZE_BUTTON)
-        # preview player buttons
-        self.btn_pre_play_pause = gtk.Button()
+
+        self.btn_pre_play_pause = Gtk.Button()
+        self.image_play = Gtk.Image.new_from_icon_name("media-playback-start", Gtk.IconSize.BUTTON)
+        self.image_pause = Gtk.Image.new_from_icon_name("media-playback-pause", Gtk.IconSize.BUTTON)
         self.btn_pre_play_pause.set_image(self.image_play)
-        btn_pre_stop = gtk.Button()
+        btn_pre_stop = Gtk.Button()
+        image_stop = Gtk.Image.new_from_icon_name("media-playback-stop", Gtk.IconSize.BUTTON)
+        
         btn_pre_stop.set_image(image_stop)
         btn_pre_stop.connect("clicked", self.on_stop_clicked)
         #Label of track to preview
         self.str_dur="00:00"
-        self.label_pre_time = gtk.Label("00:00 / 00:00")        
-        #both lambdas toggle progressbar to be not updatable by player_pre while valve is dragged
-        self.progress_pressed = lambda widget, param: self.player_pre.set_updateable_progress(False)
+        self.label_pre_time = Gtk.Label(label="00:00 / 00:00")        
 
-        self.hscale_pre = gtk.HScale()
-        self.hscale_pre.set_size_request(180, 20)
+        self.hscale_pre = Gtk.HScale(
+            halign=Gtk.Align.FILL,
+            hexpand=True)
         self.hscale_pre.set_range(0, 100)
         self.hscale_pre.set_increments(1, 10)
         self.hscale_pre.set_digits(0)
         self.hscale_pre.set_draw_value(False)
-        self.hscale_pre.set_update_policy(gtk.UPDATE_DISCONTINUOUS) 
-
 
         # the preview player
-        self.player_pre = Preview_Player(
-            self.label_pre_time, self.hscale_pre, self.reset_playbutton)
+        soundcard = "default"
+        self.player = Player(
+            self.label_pre_time, self.hscale_pre, soundcard)
+
 
         ### ---------- Playlist Section ---------- ###
         
         self.changed = False
-        label_pl = gtk.Label("Playlist")
-        label_pl.modify_font(subheader_font_1)
-        label_pl.set_size_request(80, 30)     
+        self.dict_pl = {}
+        label_pl = Gtk.Label()
+        label_pl.set_markup("<span font='Sans Bold 14'> Playlist </span>")
+        label_pl.set_valign(Gtk.Align.START)
+        label_pl.set_halign(Gtk.Align.START)     
         
-        btn_inf = gtk.Button("Details")
-        btn_inf.set_tooltip_text("Information about the selected track")
-        btn_rem = gtk.Button("Remove")
-        btn_rem.set_tooltip_text("Remove the selected track from the playlist")
-        btn_open = gtk.Button("_Open")
-        btn_open.set_tooltip_text("Open a new playlist")
-        btn_save = gtk.Button("_Save")
-        btn_save.set_tooltip_text("Save this playlist")
-        btn_saveas = gtk.Button("Save As")
-        btn_saveas.set_tooltip_text("Save this playlist as a new file with a different name")
+        # Create a menu and items
+        menu = Gtk.Menu()
+        item_detail = Gtk.MenuItem(label="Details")
+        item_remove = Gtk.MenuItem(label="Remove")
+        item_new = Gtk.MenuItem(label="New")
+        item_open = Gtk.MenuItem(label="Open")
+        item_save = Gtk.MenuItem(label="Save")
+        item_saveas = Gtk.MenuItem(label="Save as")
+        item_export = Gtk.MenuItem(label="Export")
+        item_quit = Gtk.MenuItem(label="Quit")
+
+        # Add items to the menu
+        menu.append(item_detail)
+        menu.append(item_remove)
+        menu.append(item_new)
+        menu.append(item_open)
+        menu.append(item_save)
+        menu.append(item_saveas)
+        menu.append(item_export)
+        menu.append(item_quit)
+
+        # Show the menu items
+        menu.show_all()
+
+        # Create a MenuButton with icon
+        menu_button = Gtk.MenuButton()
+        menu_button.set_popup(menu)
+        menu_image = Gtk.Image.new_from_icon_name(
+            "open-menu-symbolic", 
+            Gtk.IconSize.BUTTON
+            )
+        menu_button.add(menu_image)
         
-        
-        self.store_pl = gtk.ListStore(str ,str ,str ,str)
-        self.treeview_pl = gtk.TreeView(self.store_pl)
-        self.treeview_pl.set_rules_hint(True)
+        # create treeview with store model        
+        self.store_pl = Gtk.ListStore(str, str, str)
+        self.treeview_pl = Gtk.TreeView(model=self.store_pl)
+        self.treeview_pl.set_name("pl")
         treeselection_pl = self.treeview_pl.get_selection()
         self.add_pl_columns(self.treeview_pl)        
         
-        label_time_0 = gtk.Label("Playlist Total Time - ")
-        self.label_time_1 = gtk.Label("00:00  ")
+        # total track time
+        label_time_0 = Gtk.Label(label="Playlist Total Time - ")
+        self.label_time_1 = Gtk.Label(label="00:00  ")
 
         ### dnd and connections ###
-        self.treeview_cat.enable_model_drag_source(gtk.gdk.BUTTON1_MASK, 
-                                              [("copy-row", 0, 0)], 
-                                              gtk.gdk.ACTION_COPY)
-        self.treeview_pl.enable_model_drag_source(gtk.gdk.BUTTON1_MASK, 
-                                              [("copy-row", 0, 0)], 
-                                              gtk.gdk.ACTION_COPY)
-        self.treeview_pl.enable_model_drag_dest([("copy-row", 0, 0)], 
-                                              gtk.gdk.ACTION_COPY)
+        self.treeview_cat.enable_model_drag_source(
+            Gdk.ModifierType.BUTTON1_MASK, 
+            [("text/plain", 0, 0)], 
+            Gdk.DragAction.COPY
+            )
+        self.treeview_pl.enable_model_drag_source(
+            Gdk.ModifierType.BUTTON1_MASK, 
+            [("text/plain", 0, 0)], 
+            Gdk.DragAction.MOVE
+            )
+        self.treeview_pl.enable_model_drag_dest(
+            [("text/plain", 0, 0)], 
+            Gdk.DragAction.MOVE | Gdk.DragAction.COPY
+            )                                  
         self.treeview_cat.connect("drag_data_get", self.cat_drag_data_get_data)
         self.treeview_pl.connect("drag_data_get", self.pl_drag_data_get_data)
         self.treeview_pl.connect("drag_data_received",
                               self.drag_data_received_data)
-        self.sw_cat_lst.connect("size-allocate", self.resize_check)
+        
         self.window.connect("delete_event", self.delete_event)
         self.window.connect("destroy", self.destroy)
-        
+
         treeselection_cat.connect('changed', self.cat_selection_changed)
-        #btn_cat_simple.connect("clicked", self.simple_search)
-        #self.entry_search_simple.connect("activate", self.simple_search)
         self.entry_search_artist.connect("activate", self.search_catalogue)
         self.entry_search_album.connect("activate", self.search_catalogue)
         self.entry_search_track.connect("activate", self.search_catalogue)
@@ -458,108 +398,261 @@ class List_Maker():
         self.entry_search_genre.connect("activate", self.search_catalogue)
         self.entry_search_com.connect("activate", self.search_catalogue)
         self.entry_search_cpa.connect("activate", self.search_catalogue)
-        self.entry_search_year.connect("activate", self.search_catalogue)           
+        self.entry_search_year.connect("activate", self.search_catalogue)
+        self.cb_search_order.connect("changed", self.search_catalogue)           
         btn_search.connect("clicked", self.search_catalogue)
         self.btn_pre_play_pause.connect("clicked", self.play_pause_clicked)
         btn_pre_stop.connect("clicked", self.on_stop_clicked)
-        self.hscale_pre.connect("button-release-event", self.on_seek_changed)
-        self.hscale_pre.connect("button-press-event", self.progress_pressed)
-        btn_inf.connect("clicked", self.info_row)
-        btn_rem.connect("clicked", self.remove_row)
-        btn_open.connect("clicked", self.open_dialog)
-        btn_save.connect("clicked", self.save)
-        btn_saveas.connect("clicked", self.saveas)
+        
+        item_detail.connect("activate", self.info_row)
+        item_remove.connect("activate", self.remove_row)
+        item_new.connect("activate", self.new)
+        item_open.connect("activate", self.open_dialog)
+        item_save.connect("activate", self.save)
+        item_saveas.connect("activate", self.saveas)
+        item_export.connect("activate", self.export)
+        item_quit.connect("activate", self.delete_event)
         
         self.treeview_cat.connect('button-release-event' , self.right_click_cat_list_menu)
         self.treeview_pl.connect('button-release-event' , self.right_click_pl_list_menu)
         
         ### do the packing ###
 
-        hbox_pre_btn.pack_start(self.btn_pre_play_pause, False)
-        hbox_pre_btn.pack_start(btn_pre_stop, False)
-        hbox_pre_btn.pack_start(self.hscale_pre, True)
-        hbox_pre_btn.pack_start(self.label_pre_time, True)   
+        hbox_pre_btn.pack_start(button_expand, False, False, 5)
+        hbox_pre_btn.pack_start(self.btn_pre_play_pause, False, False, 0)
+        hbox_pre_btn.pack_start(btn_pre_stop, False, False, 0)
+        hbox_pre_btn.pack_start(self.hscale_pre, True, True, 0)
+        hbox_pre_btn.pack_start(self.label_pre_time, False, False, 0)   
 
-        table_cat.attach(label_search_artist, 0, 1, 0, 1, False, False, 5, 0)
-        table_cat.attach(self.entry_search_artist, 1, 2, 0, 1, False, False, 5, 0)
-        table_cat.attach(label_search_track, 0, 1, 1, 2, False, False, 5, 0)
-        table_cat.attach(self.entry_search_track, 1, 2, 1, 2, False, False, 5, 0)
-        table_cat.attach(label_search_album, 0, 1, 2, 3, False, False, 5, 0)
-        table_cat.attach(self.entry_search_album, 1, 2, 2, 3, False, False, 5, 0)
-        table_cat.attach(label_search_cmpy, 0, 1, 3, 4, False, False, 5, 0)
-        table_cat.attach(self.entry_search_cmpy, 1, 2, 3, 4, False, False, 5, 0)
-        table_cat.attach(label_search_com, 0, 1, 4, 5, False, False, 5, 0)
-        table_cat.attach(self.entry_search_com, 1, 2, 4, 5, False, False, 5, 0)
-        table_cat.attach(label_search_genre, 0, 1, 5, 6, False, False, 5, 0)
-        table_cat.attach(self.entry_search_genre, 1, 2, 5, 6, False, False, 5, 0)
-        table_cat.attach(label_search_cpa, 0, 1, 6, 7, False, False, 5, 0)
-        table_cat.attach(self.entry_search_cpa, 1, 2, 6, 7, False, False, 5, 0)
-        table_cat.attach(label_search_year, 0, 1, 7, 8,  False, False, 5, 0)
-        table_cat.attach(self.entry_search_year, 1, 2, 7, 8,  False, False, 5, 0)        
-        table_cat.attach(label_search_creator, 0, 1, 8, 9,  False, False, 5, 0)
-        table_cat.attach(self.cb_search_creator, 1, 2, 8, 9,  False, False, 5, 0)        
+        grid_cat.attach(
+            child=label_search_artist, 
+            left=0, 
+            top=0, 
+            width=1, 
+            height=1)
+        grid_cat.attach(
+            child=self.entry_search_artist, 
+            left=1, 
+            top=0, 
+            width=2, 
+            height=1)
+        grid_cat.attach(
+            child=label_search_track, 
+            left=0, 
+            top=1, 
+            width=1, 
+            height=1
+            )
+        grid_cat.attach(
+            child=self.entry_search_track, 
+            left=1, 
+            top=1, 
+            width=2, 
+            height=1
+            )
+        grid_cat.attach(
+            child=label_search_album, 
+            left=0, 
+            top=2,
+            width=1, 
+            height=1
+            )
+        grid_cat.attach(
+            child=self.entry_search_album, 
+            left=1, 
+            top=2, 
+            width=2, 
+            height=1
+            )
+        grid_cat.attach(
+            child=label_search_cmpy, 
+            left=0, 
+            top=3, 
+            width=1, 
+            height=1
+            )
+        grid_cat.attach(
+            child=self.entry_search_cmpy, 
+            left=1, 
+            top=3,
+            width=2, 
+            height=1
+            )
+        grid_cat.attach(
+            child=label_search_com, 
+            left=0, 
+            top=4,
+            width=1, 
+            height=1
+            )
+        grid_cat.attach(
+            child=self.entry_search_com, 
+            left=1,
+            top=4, 
+            width=2, 
+            height=1
+            )
+        grid_cat.attach(
+            child=label_search_genre, 
+            left=0, 
+            top=5, 
+            width=1, 
+            height=1
+            )
+        grid_cat.attach(
+            child=self.entry_search_genre, 
+            left=1,
+            top=5, 
+            width=2, 
+            height=1
+            )
+        grid_cat.attach(
+            child=label_search_cpa, 
+            left=0,
+            top=6,
+            width=1, 
+            height=1
+            )
+        grid_cat.attach(
+            child=self.entry_search_cpa, 
+            left=1, 
+            top=6, 
+            width=2, 
+            height=1
+            )
+        grid_cat.attach(
+            child=label_search_year, 
+            left=0, 
+            top=7, 
+            width=1, 
+            height=1
+            )
+        grid_cat.attach(
+            child=self.entry_search_year, 
+            left=1, 
+            top=7, 
+            width=2, 
+            height=1
+            )
+        grid_cat.attach(
+            child=label_search_creator, 
+            left=0,
+            top=8, 
+            width=1, 
+            height=1
+            )
+        grid_cat.attach(
+            child=self.cb_search_creator, 
+            left=1, 
+            top=8, 
+            width=2, 
+            height=1
+            )
+ 
+        grid_cat.attach(
+            child=self.chk_search_local,
+            left=0,
+            top=9,
+            width=1,
+            height=1
+            )
+        grid_cat.attach(
+            child=self.chk_search_aus,
+            left=1,
+            top=9,
+            width=2,
+            height=1
+            )
+        grid_cat.attach(
+            child=self.chk_search_fem,
+            left=0,
+            top=10,
+            width=1,
+            height=1
+            )
+        grid_cat.attach(
+            child=self.chk_search_nr,
+            left=1,
+            top=10,
+            width=2,
+            height=1
+            )
+        grid_cat.attach(
+            child=self.chk_search_demo	,
+            left=0,
+            top=11,
+            width=1,
+            height=1
+            )
+        grid_cat.attach(
+            child=self.chk_search_comp	,
+            left=1,
+            top=11,
+            width=2,
+            height=1
+            )
+        grid_cat.attach(
+            child=label_search_order,
+            left=0,
+            top=12,
+            width=1,
+            height=1
+        )
+        grid_cat.attach(
+            child=self.cb_search_order,
+            left=1,
+            top=12,
+            width=2,
+            height=1
+            )
+        grid_cat.attach(
+            child=label_search_max,
+            left=0,
+            top=13,
+            width=2,
+            height=1
+            )
+        grid_cat.attach(
+            child=self.spin_search_max,
+            left=2,
+            top=13,
+            width=1,
+            height=1
+            )
         
-
-        hbox_cat_order.pack_start(label_search_order, False)
-        hbox_cat_order.pack_start(self.cb_search_order, False)
-        hbox_cat_max.pack_start(label_search_max, False)
-        hbox_cat_max.pack_start(self.spin_search_max, False)
-
-        vbox_cat_search.pack_start(sep_cat_0, False)
-        #vbox_cat_search.pack_start(label_search_simple, False)
-        #vbox_cat_search.pack_start(self.entry_search_simple, False)
-        #vbox_cat_search.pack_start(btn_cat_simple, False)
-        #vbox_cat_search.pack_start(self.label_result_simple, False)
-        #vbox_cat_search.pack_start(sep_cat_1, False)
-        vbox_cat_search.pack_start(label_search, False)
+        vbox_cat_search.pack_start(label_search, False, False, 0)
         
-        vbox_cat_search.pack_start(table_cat, False)
-        vbox_cat_search.pack_start(self.chk_search_comp, False)
-        vbox_cat_search.pack_start(self.chk_search_demo, False)
-        vbox_cat_search.pack_start(self.chk_search_local, False)
-        vbox_cat_search.pack_start(self.chk_search_fem, False)
-        vbox_cat_search.pack_start(self.chk_search_nr, False)
-        vbox_cat_search.pack_start(hbox_cat_order, False)
-        vbox_cat_search.pack_start(hbox_cat_max, False)   
-        vbox_cat_search.pack_start(btn_search, False)
-        #vbox_cat_search.pack_start(self.entry_search_adv, False)  
-        vbox_cat_search.pack_start(self.label_search_result, False)
+        vbox_cat_search.pack_start(grid_cat, False, False, 0)
+        vbox_cat_search.pack_start(btn_search, False, False, 0)
+        vbox_cat_search.pack_start(self.label_search_result, False, False, 0)
         self.sw_cat_lst.add(self.treeview_cat)
         sw_pl.add(self.treeview_pl)   
-        vbox_cat_lst.pack_start(label_results, False)
-        vbox_cat_lst.pack_start(self.sw_cat_lst, True)
-        vbox_cat_lst.pack_start(hbox_pre_btn, False)
+        vbox_cat_lst.pack_start(label_results, False, False, 0)
+        vbox_cat_lst.pack_start(self.sw_cat_lst, True, True, 0)
+        vbox_cat_lst.pack_start(hbox_pre_btn, False, False, 0)
 
-
-
-        hbox_pl_time.pack_end(self.label_time_1, False)
-        hbox_pl_time.pack_end(label_time_0, False)
-                
-        hbox_pl.pack_start(btn_inf, False)
-        hbox_pl.pack_start(btn_rem, False)
-        hbox_pl.pack_start(btn_open, False)
-        hbox_pl.pack_start(btn_save, False)
-        hbox_pl.pack_start(btn_saveas, False)
+        hbox_pl_time.pack_end(self.label_time_1, False, False, 0)
+        hbox_pl_time.pack_end(label_time_0, False, False, 0)
+        hbox_pl.pack_start(label_pl, False, False, 0)
+        hbox_pl.pack_end(menu_button, False, False, 5)
+        vbox_pl.pack_start(hbox_pl, False, False, 0)
+        vbox_pl.pack_start(sw_pl, True, True, 0)
+        vbox_pl.pack_start(hbox_pl_time, False, False, 0)
         
-        vbox_pl.pack_start(label_pl, False)
-        vbox_pl.pack_start(hbox_pl, False)
-        vbox_pl.pack_start(sw_pl, True)
-        vbox_pl.pack_start(hbox_pl_time, False)
-        hbox_cat.pack_start(vbox_cat_search, False)  
-        hbox_cat.pack_start(vbox_cat_lst, True) 
-        hbox_cat.pack_start(vbox_pl, False)  
-        #hpane.pack1(hbox_cat, False, False)
-        #hpane.pack2(vbox_pl, False, False)
-        #window.add(hpane)
+        
+        
+        hbox_cat.pack_start(vbox_cat_search, False, False, 0)  
+        hbox_cat.pack_start(vbox_cat_lst, True, True, 0) 
+        hbox_cat.pack_start(vbox_pl, False, False, 0)  
+
+
         self.window.add(hbox_cat)
         self.window.show_all()
-        
-        gtk.gdk.threads_init()
         
         self.Saved = False
         self.name_of_open_file = None
 
-        gtk.main()
+        Gtk.main()
 
     # columns for the lists
     def add_cat_columns(self, treeview):
@@ -567,65 +660,53 @@ class List_Maker():
         Columns for the list of search results. The first column is hidden 
         and contains all the information about the track/CD in that row
         '''        
-        # variable to use with window/sw resize
-        self.column_width = 210
         
         #Column ONE
-        column = gtk.TreeViewColumn('Dict', gtk.CellRendererText(),
+        column = Gtk.TreeViewColumn('ID', Gtk.CellRendererText(), 
                                     text=0)
         column.set_sort_column_id(0)
         column.set_visible(False)
         treeview.append_column(column)
                 
         #Column TWO
-        column = gtk.TreeViewColumn('Artist', gtk.CellRendererText(),
+        column = Gtk.TreeViewColumn('Artist', Gtk.CellRendererText(),
                                     text=1)
         column.set_sort_column_id(1)
         column.set_clickable(False)
-        #column.set_resizable(True)
-        column.set_sizing(gtk.TREE_VIEW_COLUMN_FIXED)
-        column.set_fixed_width(self.column_width)
-        #column.set_sizing(gtk.TREE_VIEW_COLUMN_AUTOSIZE)
+        column.set_expand(True)
+        column.set_sizing(Gtk.TreeViewColumnSizing.GROW_ONLY)
+        column.set_fixed_width(120)        
         treeview.append_column(column)
        
         #Column THREE
-        column = gtk.TreeViewColumn('Album/Title', gtk.CellRendererText(),
+        column = Gtk.TreeViewColumn('Album/Title', Gtk.CellRendererText(),
                                     text=2)
         column.set_sort_column_id(2)
         column.set_clickable(False)
-        #column.set_resizable(True)
-        #column.set_sizing(gtk.TREE_VIEW_COLUMN_AUTOSIZE)
-        column.set_sizing(gtk.TREE_VIEW_COLUMN_FIXED)
-        column.set_fixed_width(self.column_width)
+        column.set_expand(True)
+        column.set_sizing(Gtk.TreeViewColumnSizing.GROW_ONLY)
+        column.set_fixed_width(120)
         treeview.append_column(column)
 
         #Column FOUR
-        column = gtk.TreeViewColumn('Quota', gtk.CellRendererText(),
+        column = Gtk.TreeViewColumn('Quota', Gtk.CellRendererText(),
                                     text=3)
         column.set_sort_column_id(3)
         column.set_clickable(False)
-        column.set_sizing(gtk.TREE_VIEW_COLUMN_FIXED)
+        column.set_expand(False)
+        column.set_sizing(Gtk.TreeViewColumnSizing.FIXED)
         column.set_fixed_width(66)
         treeview.append_column(column)
         
         #Column FIVE
-        column = gtk.TreeViewColumn('Length', gtk.CellRendererText(),
+        column = Gtk.TreeViewColumn('Length', Gtk.CellRendererText(),
                                     text=4)
         column.set_sort_column_id(4)
+        column.set_expand(False)
         column.set_clickable(False)
-        column.set_sizing(gtk.TREE_VIEW_COLUMN_FIXED)
+        column.set_sizing(Gtk.TreeViewColumnSizing.FIXED)
         column.set_fixed_width(68)
         treeview.append_column(column)        
-        
-    def resize_check(self, widget, allocation):
-        #allocation = self.sw_cat_lst.get_allocation()
-        width = allocation.width
-        required_width = (width - 140) / 2
-        if required_width != self.column_width:
-            for columnid in (1, 2):
-                self.column_width = required_width
-                column = self.treeview_cat.get_column(columnid)
-                column.set_fixed_width(self.column_width)
                         
     def add_pl_columns(self, treeview):
         '''
@@ -633,31 +714,26 @@ class List_Maker():
         and contains all the information about the track in that row
         '''
         # Column ONE
-        column = gtk.TreeViewColumn('Dict', gtk.CellRendererText(),
+        column = Gtk.TreeViewColumn('ID', Gtk.CellRendererText(),
                                     text=0)
         column.set_sort_column_id(0)
         column.set_visible(False)
         treeview.append_column(column)
 
         # Column TWO
-        column = gtk.TreeViewColumn('Title', gtk.CellRendererText(),
+        column = Gtk.TreeViewColumn('Title/Artist', Gtk.CellRendererText(),
                                     text=1)
         column.set_sort_column_id(1)
         column.set_clickable(False)
         column.set_max_width(360)
+        column.set_fixed_width(180)
+        column.set_expand(True)
+        column.set_sizing(Gtk.TreeViewColumnSizing.GROW_ONLY)
         treeview.append_column(column)
         
         # Column THREE
-        column = gtk.TreeViewColumn('Artist', gtk.CellRendererText(),
+        column = Gtk.TreeViewColumn('Time', Gtk.CellRendererText(),
                                     text=2)
-        column.set_sort_column_id(2)
-        column.set_visible(False)
-        column.set_clickable(False)
-        treeview.append_column(column)
-        
-        # Column FOUR
-        column = gtk.TreeViewColumn('Time', gtk.CellRendererText(),
-                                    text=3)
         column.set_sort_column_id(3)
         column.set_clickable(False)
         treeview.append_column(column)
@@ -666,90 +742,90 @@ class List_Maker():
     def cat_drag_data_get_data(self, treeview, context, selection, target_id,
                            etime):
         '''
-        copy the details from the hidden column of the selected row
-        for drag n drop from the search results list.
+        copy the track id from the hidden first column of the selected 
+        row for drag n drop from the search results list. If the
+        track length, it is a CD and set the track_id to "0"
         '''
         treeselection = treeview.get_selection()
         model, tree_iter = treeselection.get_selected()
-        
-        pickle_data = model.get_value(tree_iter, 0)
-        selection.set(gtk.gdk.SELECTION_TYPE_STRING, 8, pickle_data)
+        track_id = model.get_value(tree_iter, 0)      
+        title = model.get_value(tree_iter, 2) 
+        artist = model.get_value(tree_iter, 1) 
+        duration = model.get_value(tree_iter, 4)
+        title_artist = title + '\n' + artist
+        drag_data = (track_id, title_artist, duration)
+        text = str(drag_data)
+                    
+        selection.set_text(text, -1)
 
     def pl_drag_data_get_data(self, treeview, context, selection, target_id,
                            etime):
         '''
-        copy the details from the hidden column of the selected row
-        for drag n drop within the playlist.
+        copy the track id from the hidden first column of the selected 
+        row for drag n drop within the playlist.
         '''                                                           
         treeselection = treeview.get_selection()
         model, tree_iter = treeselection.get_selected()
-        pickle_data = model.get_value(tree_iter, 0)
-        selection.set(gtk.gdk.SELECTION_TYPE_STRING, 8, pickle_data)
-        model.remove(tree_iter)
-        
+        track_id = model.get_value(tree_iter, 0)
+        title_artist = model.get_value(tree_iter, 1)
+        duration = model.get_value(tree_iter, 2)
+        items = (track_id, title_artist, duration)
+        text = str(items)
+        selection.set_text(text, -1)
+        #model.remove(tree_iter)
+    
     def drag_data_received_data(self, treeview, context, x, y, selection,
                                 info, etime):
         '''
         add or move a row in the playlist using details copied with drag n drop.
         '''
+        actions = context.get_actions()
         model = treeview.get_model()
-        pickle_data = selection.get_text()
-        dict_data = pickle.loads(pickle_data)
-
-        if 'trackid' not in dict_data:
-            str_error = "Looks like you just tried to add a CD rather than a track"
-            self.error_dialog(str_error)
-            return
-            
-        int_time = dict_data['tracklength']
-        tracktime = self.convert_time(int_time)
-        cd_code = str(format(dict_data['cdid'], '07d')) # 7 digit
-        track_no = str(format(dict_data['tracknum'], '02d')) # 2 digit
-        tracktitle = dict_data['tracktitle']
-        trackartist = dict_data['trackartist']
-        artist = dict_data['artist']
-        if not trackartist:
-            trackartist = artist
-        
-        tracktitle = trackartist + '\n' + tracktitle
-        list_data = (pickle_data, tracktitle, trackartist, tracktime)
-
-        ID = cd_code + "-" + track_no
-        if ID and  int_time:
-            filepath = self.get_filepath(ID)
-            #remove the check for testing where there are no files
-            #print(filepath)
+        str_drag_data = selection.get_text()
+        track_id, title_artist, duration = eval(str_drag_data)
+        if "copy" in actions.value_nicks:
+            dict_track = self.dict_results[track_id]
+            cdid = str(format(dict_track['cdid'], '07d'))
+            tracknum = str(format(dict_track['tracknum'], '02d'))
+            filename = cdid + "-" + tracknum
+            print(filename)
+            filepath = self.get_filepath(filename)
             if not filepath:
-                str_error = "Unable to add to the list, file does not exist. That track has probably not yet been ripped into the music store"
-                self.error_dialog(str_error) 
+                 str_error = "Unable to add to the list, file does not exist. That track has probably not yet been ripped into the music store"
+                 self.error_dialog(str_error) 
+                 return
             
+        treeview_name = treeview.get_name()
+        drop_list = (track_id, title_artist, duration)
+        path, position = treeview.get_dest_row_at_pos(x, y) or (
+            None, None)
+
+        if path:
+            tree_iter = model.get_iter(path)
+            if (position == Gtk.TreeViewDropPosition.BEFORE
+                or position == Gtk.TreeViewDropPosition.INTO_OR_BEFORE):
+                tree_iter = model.insert_before(model.get_iter(path), drop_list)
             else:
-                drop_info = treeview.get_dest_row_at_pos(x, y)
-                if drop_info:
-                    path, position = drop_info
-                    tree_iter = model.get_iter(path)
-                    if (position == gtk.TREE_VIEW_DROP_BEFORE
-                        or position == gtk.TREE_VIEW_DROP_INTO_OR_BEFORE):
-                        model.insert_before(tree_iter, list_data)
-                        #self.join_drop(model, tree_iter, True)
-
-                    else:
-                        model.insert_after(tree_iter, list_data)
-                        #self.join_drop(model, tree_iter, False)
-                        
-                else:
-                    model.append(list_data)
-                if context.action == gtk.gdk.ACTION_MOVE:
-                    context.finish(True, True, etime)
-                
-                self.update_time_total()
-                self.changed = True
-                    
+                tree_iter = model.insert_after(model.get_iter(path), drop_list)                
         else:
-            str_error = "Error - Not enough data in the list. Please contact a station tech for assistance"
-            self.error_dialog(str_error)
+            tree_iter = model.append(drop_list)
+        
+        #If moving, delete originating row
+        if "move" in actions.value_nicks:
+            source_liststore = treeview.get_model()
+            source_selection = treeview.get_selection()
+            source_model, source_treeiter = source_selection.get_selected()
+            source_liststore.remove(source_treeiter)
+            
+        else:
+            self.dict_pl[track_id] = self.dict_results[track_id]
 
-    
+        path = model.get_path(tree_iter)
+        treeview.set_cursor(path)
+
+        self.update_time_total()
+        self.changed = True
+                    
         return
 
     # music catalogue section       
@@ -776,8 +852,8 @@ class List_Maker():
             int_res = len(result)
             self.update_result_label(int_res)
             self.length_check(result)
-            dict_data = self.process_result(result)
-            self.add_to_cat_store(dict_data)
+            list_dict_data = self.process_result(result)
+            self.add_to_cat_store(list_dict_data)
             
         else:
             self.clear_cat_list()
@@ -874,22 +950,20 @@ class List_Maker():
         str_error_none = "I can't see what you are searching for"
         str_error_len = "Please enter more than one character in your search"
         
-        if not (artist or album or track or company or comments or creator or genre or new_release or year or cpa):
+        if not (artist or 
+            album or 
+            track or 
+            company or 
+            comments or 
+            creator or 
+            genre or 
+            new_release or 
+            year or 
+            cpa):
             self.error_dialog(str_error_none)
             return False
             
-
         return search_terms
-        
-        '''
-        # comment this out for now.
-            
-        for item in (artist, album, track, company, comments, genre):
-            if item:
-                if len(item) < 2:
-                    self.error_dialog(str_error_len)
-                    return False
-        '''            
 
     def create_query(self, search_terms):
         select_statement = sql.SQL("SELECT")
@@ -999,7 +1073,6 @@ class List_Maker():
         dict_cur.close()
         conn.close()  
         
-
         # convert the results to a true dictionary - for testing purposes
         #row_dict = [{k:v for k, v in record.items()} for record in result]
         #print(row_dict)
@@ -1038,27 +1111,33 @@ class List_Maker():
             str_warn_1 = " or more results. Only displaying the first "
             str_warn_2 = ". Please modify your search and be more specific "
             str_warn_3 = "or increase the number for the Maximum Results."
-            str_warn = str_warn_0 + str(query_limit) + str_warn_1 + str(query_limit) + str_warn_2
+            str_warn = (str_warn_0 + 
+                str(query_limit) + 
+                str_warn_1 + 
+                str(query_limit) + 
+                str_warn_2 + 
+                str_warn_3)
             self.warn_dialog(str_warn)
 
     def process_result(self, result):
-        dict_data = []
+        list_dict_data = []
         first = True
         separator = '''
         -----------------------
         '''
         for item in result:
             if first:
-                dict_data.append(item)
+                list_dict_data.append(item)
                 first = False
             else:
-                if item["trackid"] == dict_data[-1]["trackid"]:
-                    dict_data[-1]["comment"] = dict_data[-1]["comment"] + separator + item["comment"]
+                # is there a second result for the comment?
+                if item["trackid"] == list_dict_data[-1]["trackid"]:
+                    list_dict_data[-1]["comment"] = list_dict_data[-1]["comment"] + separator + item["comment"]
                 else:
-                    dict_data.append(item)
-        return dict_data
+                    list_dict_data.append(item)
+        return list_dict_data
     
-    def add_to_cat_store(self, dict_data):
+    def add_to_cat_store(self, list_dict_data):
         '''
         take the results of the search and display as rows in a treeview list
         full search details for each item go into the hidden column 
@@ -1066,16 +1145,14 @@ class List_Maker():
 
         # remove extra results caused by multiple comments 
         # and then concatenate the comments
-        
-
-
+        self.dict_results = {}
         self.clear_cat_list()
         var_album = ""
+        model = self.treeview_cat.get_model()
             
-        for item in dict_data:
-            model = self.treeview_cat.get_model()
-
-            pickle_list = pickle.dumps(item)
+        for item in list_dict_data:
+            track_id = item['trackid']
+            track_id = str(track_id)
             album = item['title']
             tracktitle = item['tracktitle']
             artist = item['artist']
@@ -1122,20 +1199,13 @@ class List_Maker():
                 album = "(No Title)"
 
             if not album == var_album:
-                # create a pickle of dictionary for the CD row.
-                cd_dict = dict(item)
-                for item in select_items:
-                    table, column = item.split(".")
-                    if table == "cdtrack" and column != "cdid":
-                        del cd_dict[column]
-                    cd_pickle = pickle.dumps(cd_dict)
-
-
-                n = model.append(None, [cd_pickle, artist, album, quota, ""])
-                model.append(n, [pickle_list, trackartist, tracktitle, "", dur_time])
+                n = model.append(None, [track_id, artist, album, quota, ""])
+                model.append(n, [track_id, trackartist, tracktitle, "", dur_time])
             else:
-                model.append(n, [pickle_list, trackartist, tracktitle, "", dur_time])
+                model.append(n, [track_id, trackartist, tracktitle, "", dur_time])
             var_album = album
+            
+            self.dict_results[track_id] = item
         
     def get_dict_creator(self):
         '''
@@ -1160,7 +1230,6 @@ class List_Maker():
         query = "SELECT DISTINCT cd.createwho, users.first, users.last FROM cd JOIN users ON cd.createwho = users.id ORDER BY users.first"
         conn = self.pg_connect_cat()
         cur = conn.cursor()
-        #dict_cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         cur.execute(query)
         list_creator = cur.fetchall()
         cur.close()
@@ -1171,7 +1240,7 @@ class List_Maker():
         '''
         populate the drop down list of contributors
         '''
-        liststore_creator = gtk.ListStore(str)        
+        liststore_creator = Gtk.ListStore(str)        
         list_creator = sorted(dict_creator.values())
         
 
@@ -1180,26 +1249,12 @@ class List_Maker():
         self.cb_search_creator.prepend_text("")
         self.cb_search_creator.append_text("")
 
-
-        '''
-        an orphaned function?
-        ...will delete after checking
-                
-    def get_order(self):
-        
-        model = self.cb_search_order.get_model()
-        active = self.cb_search_order.get_active()
-        if active < 0:
-            return None
-        return model[active][0]
-        '''
-
     def cb_order_add(self):
         '''
         populate the drop down list for selecting the order to list 
         search results 
         '''
-        list_order = order_results.keys()
+        list_order = list(order_results.keys())
         list_order.sort()
         for item in list_order:
             self.cb_search_order.append_text(item)
@@ -1212,7 +1267,15 @@ class List_Maker():
         model = self.treeview_cat.get_model()
         model.clear()
 
-
+    def expand_collapse(self, widget):
+        if widget.get_label() == "Expand All":
+            self.treeview_cat.expand_all()
+            widget.set_label("Collapse All")
+        
+        elif widget.get_label() == "Collapse All":
+            self.treeview_cat.collapse_all()
+            widget.set_label("Expand All")
+        
 
     # preview section  
     def get_sel_filepath(self):
@@ -1223,10 +1286,10 @@ class List_Maker():
         '''
         treeselection = self.treeview_cat.get_selection()
         model, tree_iter = treeselection.get_selected()
-        pickle_list = model.get_value(tree_iter, 0)
-        data_list = pickle.loads(pickle_list)
-        ID = data_list['cdid']
-        tracknum = data_list['tracknum']
+        track_id = model.get_value(tree_iter, 0)
+        track_data = self.dict_results[track_id]
+        ID = track_data['cdid']
+        tracknum = track_data['tracknum']
         ID = str(ID).zfill(7) + "-" + str(tracknum).zfill(2)
         filepath = self.get_filepath(ID)
         if not filepath:
@@ -1242,41 +1305,32 @@ class List_Maker():
         '''
         filepath = self.get_sel_filepath()
         if filepath:
+            self.player.set_filepath(filepath)
             img = self.btn_pre_play_pause.get_image()
-            if img.get_name() == "play":          
+            if img == self.image_play:          
                 self.btn_pre_play_pause.set_image(self.image_pause)
-                self.player_pre.start(filepath)
+                self.player.play()
                 
             else:
-                self.player_pre.pause()
+                self.player.pause()
                 self.btn_pre_play_pause.set_image(self.image_play)
                 
     def on_stop_clicked(self, widget):
         '''
         stop playing the track
         '''
-        self.player_pre.stop()
+        self.player.stop()
         self.btn_pre_play_pause.set_image(self.image_play)
         self.label_pre_time.set_text("00:00 / " + self.str_dur)
+        self.hscale_pre.set_value(0)
     
-    def reset_playbutton(self):
-        '''
-        set the pause/play image
-        '''
-        self.btn_pre_play_pause.set_image(self.image_play)
-        
     def cat_selection_changed(self, selection):
         '''
         stop playing the preview when another track is selected
         '''
-        playstatus = self.player_pre.get_state() 
-        if (playstatus == gst.STATE_PLAYING) or (playstatus == gst.STATE_PAUSED):
-            self.on_stop_clicked(True)
-            
-    def on_seek_changed(self, widget, param):
-        self.player_pre.set_updateable_progress(True)
-        self.player_pre.set_place_in_file(self.hscale_pre.get_value())
-    
+        playstatus = self.player.get_state()     
+        if (playstatus == Gst.State.PLAYING) or (playstatus == Gst.State.PAUSED):
+            self.player.stop()
 
     # playlist section
     def update_time_total(self):
@@ -1284,14 +1338,14 @@ class List_Maker():
         tree_iter = model.get_iter_first()
         total_time = 0
         while tree_iter:
-            pickle_data = model.get_value(tree_iter, 0)
-            dict_data = pickle.loads(pickle_data)
-            int_time = dict_data['tracklength']
-            int_time = int(int_time)
-            total_time = total_time + int_time
+            str_duration = model.get_value(tree_iter, 2)
+            numbers = reversed(str_duration.split(':'))
+            seconds = sum(int(x) * 60 ** i for i, x in enumerate(numbers))
+            total_time = total_time + seconds
             tree_iter = model.iter_next(tree_iter)
+            
         str_time = self.convert_time(total_time)
-        self.label_time_1.set_text(str_time + "  ")
+        self.label_time_1.set_text(str_time)
 
     def get_filename(self, act, name):
         '''
@@ -1299,77 +1353,59 @@ class List_Maker():
     
         '''
         if act == "open_file":
-            action = gtk.FILE_CHOOSER_ACTION_OPEN
-            btn = gtk.STOCK_OPEN
+            action = Gtk.FileChooserAction.OPEN
+            btn = Gtk.STOCK_OPEN
+            title = "Select a Playlist"
 
         elif act == "save_file":
-            action = gtk.FILE_CHOOSER_ACTION_SAVE
-            btn = gtk.STOCK_SAVE
+            action = Gtk.FileChooserAction.SAVE
+            btn = Gtk.STOCK_SAVE
+            title = "Save Playlist"
 
-        dialog = gtk.FileChooserDialog(
-            "Select a Playlist",
-            None,
-            action,
-            (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
-            btn, gtk.RESPONSE_ACCEPT)
+        dialog = Gtk.FileChooserDialog(
+            title=title,
+            action=action
+            )
+        
+        dialog.add_buttons(
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+            btn, Gtk.ResponseType.ACCEPT
             )
 
-
-        dialog.set_default_response(gtk.RESPONSE_ACCEPT)
+        dialog.set_default_response(Gtk.ResponseType.ACCEPT)
 
         dialog.set_current_folder(dir_pl3d)
         dialog.set_do_overwrite_confirmation(True)
         if name:
             dialog.set_current_name(name)
-
-        filter = gtk.FileFilter()
-        filter.set_name("Playlist files")
-        filter.add_pattern("*.pl3d")
-        filter.add_pattern("*.p3d")
-        dialog.add_filter(filter)
+            filetype = name.split(".")[-1]
         
+            filter = Gtk.FileFilter()
+            if filetype == "p3d":
+                filter.set_name("Playlist files")
+                filter.add_pattern("*.pl3d")
+                filter.add_pattern("*.p3d")
+
+            elif filetype == "mp3":
+                filter.set_name("mp3 files")
+                filter.add_pattern("*.mp3")
+                dialog.set_current_folder(os.path.expanduser('~'))                
+        
+            dialog.add_filter(filter)   
+                 
         response = dialog.run()
         
-        if response == gtk.RESPONSE_ACCEPT:
+        if response == Gtk.ResponseType.ACCEPT:
             filename = dialog.get_filename()
             dialog.destroy()
             return filename
-                
-        elif response == gtk.RESPONSE_CANCEL:
-            dialog.destroy()
+           
+        else:
+            dialog.destroy()    
             return None
 
     def info_row(self, widget):    
         self.show_details(widget, self.treeview_pl)
-
-
-    def info_message(self, datatuple):
-        title = datatuple[0]
-        artist = datatuple[1]
-        album = datatuple[2]
-        company = datatuple[3] 
-        
-        title_txt = "Title: {0}".format (title)
-        artist_txt = "Artist: {0}".format (artist)
-        album_txt = "Album: {0}".format (album)
-        company_txt = "Company: {0}".format (company)
-        
-        label_title = gtk.Label(title_txt)
-        label_artist = gtk.Label(artist_txt)   
-        label_album = gtk.Label(album_txt)
-        label_company = gtk.Label(company_txt)
-           
-        dialog = gtk.Dialog("Information", None, 0, (gtk.STOCK_OK, gtk.RESPONSE_OK))
-        dialog.set_default_size(350, 150)
-
-        dialog.vbox.pack_start(label_artist, True, True, 0)
-        dialog.vbox.pack_start(label_title, True, True, 0)
-        dialog.vbox.pack_start(label_album, True, True, 0)
-        dialog.vbox.pack_start(label_company, True, True, 0)
-        
-        dialog.show_all()
-        dialog.run()
-        dialog.destroy()
 
     def remove_row(self, widget):    
         treeselection = self.treeview_pl.get_selection()
@@ -1391,8 +1427,8 @@ class List_Maker():
         tree_iter = model.get_iter_first()
         ls_tracklist = []
         while tree_iter:
-            pickle_row = model.get_value(tree_iter, 0)
-            dict_row = pickle.loads(pickle_row)
+            track_id = model.get_value(tree_iter, 0)
+            dict_row = self.dict_pl[track_id]
             ls_tracklist.append(dict_row)
             tree_iter = model.iter_next(tree_iter)
 
@@ -1404,11 +1440,20 @@ class List_Maker():
         check if there is a changed playlist open and ask if you want to save 
         it before opening another
         '''
-        action = "open_file"
         if self.changed:
-            self.save_change()
+            response = self.save_change()
+            
+            if response == Gtk.ResponseType.ACCEPT:
+                self.save(None)
+            
+            elif response == Gtk.ResponseType.CANCEL:
+                return
+
+        action = "open_file"
+        
         filename = self.get_filename(action, None)
         filesp, filesfx = os.path.splitext(filename)
+        self.window.set_title(filesp)
         
 
         if not (filesfx == sfx or filesfx == sfx_old):
@@ -1421,15 +1466,17 @@ class List_Maker():
             self.changed = False
             
         if filesfx == ".p3d":
-            ls_data = pickle.load(open(filename, "rb"))
+            ls_data = pickle.load((open(filename, "rb")), encoding='latin1')
             
         elif filesfx == ".pl3d":
             ls_data = self.pl3d2pylist(filename)
 
         model = self.treeview_pl.get_model()
         model.clear()
+        self.dict_pl = {}
         
         for dict_data in ls_data:
+            track_id = str(dict_data['trackid'])
             int_time = dict_data['tracklength']
             tracktime = self.convert_time(int_time)
             tracktitle = dict_data['tracktitle']
@@ -1440,36 +1487,84 @@ class List_Maker():
                 trackartist = artist
                 
             tracktitle = trackartist + '\n' + tracktitle
-            pickle_data = pickle.dumps(dict_data)
+            
                 
-            model.append((pickle_data, tracktitle, trackartist, tracktime))
+            model.append((track_id, tracktitle, tracktime))
             
             self.update_time_total()
             self.name_of_open_file = filename
+            self.dict_pl[track_id] = dict_data
 
-    def save_change(self):
-        dialog = gtk.Dialog("Save List?", None, 0, 
-        (gtk.STOCK_OK, gtk.RESPONSE_OK, 
-         gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL))
-        
-        ask_save = '''
-        Do you want to save the changes that you made to this list 
-        before you open another one?
-        
-        Click 'OK' to save 
-        Or click 'Cancel' to open a new list without saving this one
-        '''
-        
-        label_save = gtk.Label(ask_save)
-        dialog.vbox.pack_start(label_save, True, True, 0)
+    
+    def confirm_close(self):
+        dialog = Gtk.Dialog("Confirm Close")
+        dialog.set_default_size(150, 100)
+        message = "Are you sure you want to close ListMaker?"
+        dialog.add_buttons("OK", Gtk.ResponseType.OK,
+                "Cancel", Gtk.ResponseType.CANCEL)
+        label = Gtk.Label(label=message)
+        label.set_line_wrap(True)
+        box = dialog.get_content_area()
+        box.add(label)
         dialog.show_all()
         
-        
         response = dialog.run()
-        if response == gtk.RESPONSE_OK:
-            self.save(None)
         dialog.destroy()
-                        
+    
+        if response == Gtk.ResponseType.OK:
+            return False
+        else:
+            return True        
+    
+    
+    def save_change(self):
+        dialog = Gtk.Dialog("List Changed")
+        dialog.set_default_size(150, 100)
+        dialog.add_buttons("Save", Gtk.ResponseType.ACCEPT,
+                  "Discard", Gtk.ResponseType.REJECT,
+                  "Cancel", Gtk.ResponseType.CANCEL)
+
+        message = "Your list has changed, do you want to save it?"
+        label = Gtk.Label(label=message)
+        label.set_line_wrap(True)
+        box = dialog.get_content_area()
+        box.add(label)
+        dialog.show_all()
+
+        response = dialog.run()
+        dialog.destroy()
+        return response
+        
+
+                
+    def new(self, widget):
+        '''
+        confirm save existing playlist
+        clear tracks from treeviews and dictionaries
+        use filechooser to select name and path of new list
+        '''
+        if self.changed:
+            response = self.save_change()
+        
+            if response == Gtk.ResponseType.ACCEPT:
+                self.save(None)
+            
+            elif response == Gtk.ResponseType.CANCEL:
+                return
+            
+        model = self.treeview_pl.get_model()
+        model.clear()
+        model = self.treeview_cat.get_model()
+        model.clear()
+        
+        self.changed = False
+        
+        self.dict_pl = {}
+        self.dict_results = ()
+        self.window.set_title("Untitled")
+        self.Saved = False
+        self.name_of_open_file = None
+        
     def save(self, widget):
         '''
         save the file. First check that it is not a new file.
@@ -1507,9 +1602,9 @@ class List_Maker():
         action = "save_file"
         name = "Untitled.p3d"
         filename = self.get_filename(action, name)
-        filesp, filesfx = os.path.splitext(filename)
         
         if filename:
+            filesp, filesfx = os.path.splitext(filename)
             if not (filesfx == sfx):
                 filename = filesp + sfx
             
@@ -1520,6 +1615,84 @@ class List_Maker():
             ls_tracklist = self.get_tracklist()
             pickle.dump(ls_tracklist, open(filename, "wb"))
             self.name_of_open_file = filename
+
+    def export(self, widget):
+        '''
+        combine and save the tracks in the playlist into a single mp3
+        '''
+        # get and the file path for each track and add to a list
+        filelist = []
+        model = self.treeview_pl.get_model()
+        for row in model:
+            track_id = row[0]
+            dict_data = self.dict_pl[track_id]
+            cdid = dict_data['cdid'] 
+            tracknum = dict_data['tracknum']
+            ID = str(cdid).zfill(7) + "-" + str(tracknum).zfill(2)
+            filepath = self.get_filepath(ID)
+            filelist.append(filepath)
+        
+        
+        if filelist:
+            # run the filechooser to select where to save
+            action = "save_file"
+            name = "Untitled.mp3"  
+            export_file =  self.get_filename(action, name) 
+             
+            # start the export function in its own thread
+            # export_thread = threading.Thread(target=self.combine_export, args=(filelist, export_file))
+            #export_thread.daemon = True
+            # export_thread.start()
+            
+            # start the progress window in its own thread
+            
+            dialog = Gtk.Dialog()
+            dialog.set_default_size(150, 100)
+
+            # Create a box for the dialog contents
+            box = dialog.get_content_area()
+
+            # Add a spinner widget to the box
+            spinner = Gtk.Spinner()
+            spinner.start()
+            box.add(spinner)
+            label = Gtk.Label(label="Exporting playlist, please wait")
+            box.add(label)
+
+            dialog.show_all()
+        
+            
+        else:
+            message = "You need to have something in the playlist before you can export it"
+            self.error_dialog(message)
+    
+        def show_progress():
+            '''
+            subfunction run in thread to indicate export
+            '''
+            print("run the dialog")
+            dialog.run()
+            print("destroy the dialog")
+            GLib.idle_add(dialog.destroy)
+        
+        threading.Thread(target=show_progress).start()
+        
+        def combine_export():
+            '''
+            subfunction run in thread to create combined export
+            '''
+            print("exporting") 
+            combined = pydub.AudioSegment.empty()
+            
+            for song in filelist:
+                audiosegment = pydub.AudioSegment.from_file(song, format="mp3")
+                combined = combined + audiosegment
+            combined.export(export_file, format="mp3")
+            print("export completed")
+            GLib.idle_add(dialog.response, Gtk.ResponseType.OK)
+        
+        threading.Thread(target=combine_export).start()
+            
                 
     def pl3d2pylist(self, filename):
         '''
@@ -1534,13 +1707,13 @@ class List_Maker():
 
         for track in el_tracklist:
             if track.find("%sidentifier" % ns) is not None:
-                trackid = track.find("%sidentifier" % ns).text
-                trackid = int(trackid)
-                ls_tracklist.append(trackid)
+                track_id = track.find("%sidentifier" % ns).text
+                track_id = int(track_id)
+                ls_tracklist.append(track_id)
         
-        for trackid in ls_tracklist:
+        for track_id in ls_tracklist:
             search_terms = {}
-            search_terms["cdtrack.trackid"] = trackid
+            search_terms["cdtrack.trackid"] = track_id
             query = self.create_query(search_terms)
             result = self.execute_query(query, search_terms)
             dict_data = self.process_result(result)
@@ -1552,371 +1725,697 @@ class List_Maker():
     #common functions
     def right_click_cat_list_menu(self, treeview, event):
         if event.button == 3: # right click
-            
             selection = treeview.get_selection()
             model, tree_iter = selection.get_selected()
-            pickle_data = model.get_value(tree_iter, 0)
-            dict_data = pickle.loads(pickle_data)
-            
-            
-            
-            context_menu = gtk.Menu()
-            details_item = gtk.MenuItem( "Details")
+            track_id = model.get_value(tree_iter, 0)
+            duration = model.get_value(tree_iter, 4)
+            dict_data = self.dict_results[track_id]
+            context_menu = Gtk.Menu()
+            details_item = Gtk.MenuItem(label = "Details")
             details_item.connect( "activate", self.show_details, treeview)
             details_item.show()
-            play_item = gtk.MenuItem("Play")
-            play_item.connect("activate", self.play_from_menu, treeview)
+            play_item = Gtk.MenuItem(label = "Play")
+            play_item.connect("activate", self.play_from_menu, treeview, track_id)
             play_item.show()
-            add_item = gtk.MenuItem("Add")
+            add_item = Gtk.MenuItem(label = "Add")
             add_item.connect("activate", self.add_to_playlist, treeview)
             add_item.show()
             context_menu.append(details_item)
             context_menu.append(play_item)
             context_menu.append(add_item)
             
-            if not 'trackid' in dict_data:
+            if not duration:
                 play_item.set_sensitive(False)
                 add_item.set_sensitive(False)
                 
-            context_menu.popup( None, None, None, event.button, event.get_time())
+            context_menu.popup_at_pointer()
     
     def right_click_pl_list_menu(self, treeview, event):
         if event.button == 3: # right click
-            context_menu = gtk.Menu()
-            details_item = gtk.MenuItem( "Details")
-            details_item.connect( "activate", self.show_details, treeview)
+            selection = treeview.get_selection()
+            model, tree_iter = selection.get_selected()
+            track_id = model.get_value(tree_iter, 0)
+            context_menu = Gtk.Menu()
+            remove_item = Gtk.MenuItem(label = "Remove")
+            remove_item.connect("activate", self.remove_row)
+            remove_item.show()
+            details_item = Gtk.MenuItem(label = "Details")
+            details_item.connect("activate", self.show_details, treeview)
             details_item.show()
-            play_item = gtk.MenuItem("Play")
-            play_item.connect( "activate", self.play_from_menu, treeview)
+            play_item = Gtk.MenuItem(label = "Play")
+            play_item.connect( "activate", self.play_from_menu, treeview, track_id)
             play_item.show()
+            context_menu.append(remove_item)
             context_menu.append(details_item)
             context_menu.append(play_item)
-            context_menu.popup( None, None, None, event.button, event.get_time())
-  
-    def add_to_playlist(self, treeview):
-        '''
-        from right-click menu add the selected track to the playlist
-        '''
+            context_menu.popup_at_pointer()
+
     def add_to_playlist(self, widget, treeview):
         '''
         from right-click menu add the selected track to the playlist
         '''
-        selection = treeview.get_selection()
-        model, tree_iter = selection.get_selected()
-        pickle_data = model.get_value(tree_iter, 0)
-        dict_data = pickle.loads(pickle_data)
+        treeselection = treeview.get_selection()
+        model, tree_iter = treeselection.get_selected()
+        track_id = model.get_value(tree_iter, 0)      
+        title = model.get_value(tree_iter, 2) 
+        artist = model.get_value(tree_iter, 1) 
+        duration = model.get_value(tree_iter, 4)
+        title_artist = title + '\n' + artist
+        add_list = (track_id, title_artist, duration)
         
-        if 'trackid' in dict_data:
-            model = self.treeview_pl.get_model()
-            int_time = dict_data['tracklength']
-            tracktime = self.convert_time(int_time)
-            cd_code = str(format(dict_data['cdid'], '07d')) # 7 digit
-            track_no = str(format(dict_data['tracknum'], '02d')) # 2 digit
-            tracktitle = dict_data['tracktitle']
-            trackartist = dict_data['trackartist']
-            artist = dict_data['artist']
-            
-            if not trackartist:
-                trackartist = artist
-            
-            tracktitle = trackartist + '\n' + tracktitle
-            list_data = (pickle_data, tracktitle, trackartist, tracktime)
-            model.append(list_data)
+        model_pl = self.treeview_pl.get_model()
+        tree_iter = model_pl.append(add_list)
+        self.dict_pl[track_id] = self.dict_results[track_id]
         
+        path = model_pl.get_path(tree_iter)
+        self.treeview_pl.set_cursor(path)
+
+        self.update_time_total()
+        self.changed = True
         
     def get_details(self, treeview):
+        treeview_name = treeview.get_name()
         selection = treeview.get_selection()
         model, tree_iter = selection.get_selected()
-        pickle_data = model.get_value(tree_iter, 0)
-        dict_data = pickle.loads(pickle_data)
+        track_id = model.get_value(tree_iter, 0)
+        
+        if treeview_name == "pl":
+            dict_data = self.dict_pl[track_id]
+            dict_data["is_cd"] = False 
+            
+        else:
+            duration = model.get_value(tree_iter, 4)
+        
+            if not duration:
+                dict_data = self.dict_results[track_id]
+                dict_data["is_cd"] = True
+            
+            else:
+                dict_data = self.dict_results[track_id]
+                dict_data["is_cd"] = False        
+            
         return dict_data
         
     def show_details(self, widget, treeview):
         
-        dialog = gtk.Dialog("Details", None, 0, (
-            gtk.STOCK_OK, gtk.RESPONSE_OK))
-        table_details = gtk.Table(20, 2, False)
-        dialog.vbox.pack_start(table_details, True, True, 0)
+        dialog = Gtk.Dialog(
+            title = "Details", 
+            transient_for = self.window,
+            flags = 0
+            )
+        dialog.add_buttons(Gtk.STOCK_OK, Gtk.ResponseType.OK)
+        grid_details = Gtk.Grid(hexpand=True, vexpand=False)
+        grid_details.set_row_homogeneous(False)
+        grid_details.set_column_homogeneous(False)
+        grid_details.set_valign(Gtk.Align.FILL)
+        grid_details.set_margin_top(margin=5)                                                                            
+        grid_details.set_margin_end(margin=5)                                                                            
+        grid_details.set_margin_bottom(margin=5)                                                                         
+        grid_details.set_margin_start(margin=5)                                                                          
+        grid_details.set_row_spacing(spacing=5)                                                                          
+        grid_details.set_column_spacing(spacing=5)
+        
+        dialog.vbox.pack_start(grid_details, True, True, 0)
         dict_details = self.get_details(treeview)
+        is_cd = dict_details["is_cd"]
         
         n = 0
-        
-        if "trackartist" in dict_details:
-            artist = dict_details["trackartist"]
-            if not artist:
-                artist = dict_details["artist"]
-        else: 
-            artist = dict_details["artist"]
+
+        artist = dict_details["artist"]
             
-        label_detail_artist = gtk.Label()
-        label_detail_artist.set_alignment(0, 0.5)
-        label_detail_artist.set_text("Artist: ")        
-        table_details.attach(label_detail_artist, 0, 1, n, n + 1, False, False, 5, 0)
+        label_detail_artist = Gtk.Label()
+
+        label_detail_artist.set_halign(Gtk.Align.START)
+        label_detail_artist.set_hexpand(True)
+        label_detail_artist.set_justify(Gtk.Justification.LEFT)
+        label_detail_artist.set_text("Album Artist: ")        
+        grid_details.attach(
+            child=label_detail_artist, 
+            left=0, 
+            top=n, 
+            width=1,
+            height=1
+            )
         
-        label_artist = gtk.Label()
-        label_artist.set_alignment(0, 0.5)
+        label_artist = Gtk.Label()
+        label_artist.set_halign(Gtk.Align.START)
+        label_artist.set_hexpand(True)
+        label_artist.set_justify(Gtk.Justification.LEFT)
         label_artist.set_text(artist)
         label_artist.set_selectable(True)
-        table_details.attach(label_artist, 1, 2, n, n + 1, False, False, 5, 0)
+        grid_details.attach(
+            child=label_artist, 
+            left=1, 
+            top=n, 
+            width=1,
+            height=1
+            )
 
         n += 1 
 
-        if "tracktitle" in dict_details:
-            label_detail_track = gtk.Label()
-            label_detail_track.set_text("Track: ")
-            label_detail_track.set_alignment(0, 0.5)
-            table_details.attach(label_detail_track, 0, 1, n, n + 1, False, False, 5, 0)
+        if not is_cd:
+            trackartist = dict_details["trackartist"]
             
-            label_track = gtk.Label()
+            if trackartist and trackartist != artist:
+                label_detail_trackartist = Gtk.Label()
+                label_detail_trackartist.set_halign(Gtk.Align.START)
+                label_detail_trackartist.set_hexpand(True)
+                label_detail_trackartist.set_justify(Gtk.Justification.LEFT)
+                label_detail_trackartist.set_text("Track Artist: ")        
+                grid_details.attach(
+                    child=label_detail_trackartist, 
+                    left=0, 
+                    top=n, 
+                    width=1,
+                    height=1
+                    )
+                
+                label_trackartist = Gtk.Label()
+                label_trackartist.set_halign(Gtk.Align.START)
+                label_trackartist.set_hexpand(True)
+                label_trackartist.set_justify(Gtk.Justification.LEFT)
+                label_trackartist.set_text(trackartist)
+                label_trackartist.set_selectable(True)
+                grid_details.attach(
+                    child=label_trackartist, 
+                    left=1, 
+                    top=n, 
+                    width=1,
+                    height=1
+                    )
+
+            n += 1 
+
+        if "tracktitle" in dict_details and not is_cd:
+            label_detail_track = Gtk.Label()
+            label_detail_track.set_text("Track: ")
+            label_detail_track.set_halign(Gtk.Align.START)
+            label_detail_track.set_hexpand(True)
+            label_detail_track.set_justify(Gtk.Justification.LEFT)
+            grid_details.attach(
+                child=label_detail_track, 
+                left=0, 
+                top=n, 
+                width=1,
+                height=1
+                )
+            
+            label_track = Gtk.Label()
             track = dict_details['tracktitle']
             label_track.set_text(track)
             label_track.set_selectable(True)
-            label_track.set_alignment(0, 0.5)
-            table_details.attach(label_track, 1, 2, n, n + 1, False, False, 5, 0)
+            label_track.set_halign(Gtk.Align.START)
+            label_track.set_hexpand(True)
+            label_track.set_justify(Gtk.Justification.LEFT)
+            grid_details.attach(
+                child=label_track, 
+                left=1, 
+                top=n, 
+                width=1,
+                height=1
+                )
             
             n += 1    
                 
-        label_detail_album = gtk.Label()
+        label_detail_album = Gtk.Label()
         label_detail_album.set_text("Album: ")
-        label_detail_album.set_alignment(0, 0.5)
-        table_details.attach(label_detail_album, 0, 1, n, n + 1, False, False, 5, 0)
+        label_detail_album.set_halign(Gtk.Align.START)
+        label_detail_album.set_hexpand(True)
+        label_detail_album.set_justify(Gtk.Justification.LEFT)
+        grid_details.attach(
+            child=label_detail_album, 
+            left=0, 
+            top=n, 
+            width=1,
+            height=1
+            )
         
-        label_album = gtk.Label()
+        label_album = Gtk.Label()
         album = dict_details['title']
         label_album.set_text(album)
         label_album.set_selectable(True)
-        label_album.set_alignment(0, 0.5)
-        table_details.attach(label_album, 1, 2, n, n + 1, False, False, 5, 0)
+        label_album.set_halign(Gtk.Align.START)
+        label_album.set_hexpand(True)
+        label_album.set_justify(Gtk.Justification.LEFT)
+        grid_details.attach(
+            child=label_album, 
+            left=1, 
+            top=n, 
+            width=1,
+            height=1
+            )
 
         n += 1
 
-        label_detail_local = gtk.Label()
-        label_detail_local.set_alignment(0, 0.5)
+        label_detail_local = Gtk.Label()
+        label_detail_local.set_halign(Gtk.Align.START)
+        label_detail_local.set_hexpand(True)
+        label_detail_local.set_justify(Gtk.Justification.LEFT)
         label_detail_local.set_text("Local: ")
-        table_details.attach(label_detail_local, 0, 1, n, n + 1, False, False, 5, 0)
+        grid_details.attach(
+            child=label_detail_local, 
+            left=0, 
+            top=n, 
+            width=1,
+            height=1
+            )
                 
-        label_local = gtk.Label()
-        label_local.set_alignment(0, 0.5)
-        label_local.set_selectable(True)
+        label_local = Gtk.Label()
+        label_local.set_halign(Gtk.Align.START)
+        label_local.set_hexpand(True)
+        label_local.set_justify(Gtk.Justification.LEFT)
         local = dict_details['local']
         local = unys[local]
         label_local.set_text(local)
-        table_details.attach(label_local, 1, 2, n, n + 1, False, False, 5, 0)
+        grid_details.attach(
+            child=label_local, 
+            left=1, 
+            top=n, 
+            width=1,
+            height=1
+            )
         
         n += 1
 
-        label_detail_female = gtk.Label()
-        label_detail_female.set_alignment(0, 0.5)
+        label_detail_female = Gtk.Label()
+        label_detail_female.set_halign(Gtk.Align.START)
+        label_detail_female.set_hexpand(True)
+        label_detail_female.set_justify(Gtk.Justification.LEFT)
         label_detail_female.set_text("Female: ")
-        table_details.attach(label_detail_female, 0, 1, n, n + 1, False, False, 5, 0)      
+        grid_details.attach(
+            child=label_detail_female, 
+            left=0, 
+            top=n, 
+            width=1,
+            height=1
+            )   
 
-        label_female = gtk.Label()
-        label_female.set_alignment(0, 0.5)
+        label_female = Gtk.Label()
+        label_female.set_halign(Gtk.Align.START)
+        label_female.set_hexpand(True)
+        label_female.set_justify(Gtk.Justification.LEFT)
         label_female.set_selectable(True)
         female = dict_details['female']
         female = unys[female]
         label_female.set_text(female)
-        table_details.attach(label_female, 1, 2, n, n + 1, False, False, 5, 0)
+        grid_details.attach(
+            child=label_female, 
+            left=1, 
+            top=n, 
+            width=1,
+            height=1
+            )
         
         n += 1
         
-        if "tracklength" in dict_details:
-            label_detail_tracklength = gtk.Label()
+        if "tracklength" in dict_details and not is_cd:
+            label_detail_tracklength = Gtk.Label()
+            label_detail_tracklength.set_halign(Gtk.Align.START)
+            label_detail_tracklength.set_hexpand(True)
+            label_detail_tracklength.set_justify(Gtk.Justification.LEFT)
             label_detail_tracklength.set_text("Track Length: ")
-            label_detail_tracklength.set_alignment(0, 0.5)
-            table_details.attach(label_detail_tracklength, 0, 1, n, n + 1, False, False, 5, 0)
+            grid_details.attach(
+                child=label_detail_tracklength, 
+                left=0, 
+                top=n, 
+                width=1,
+                height=1
+                )
             
-            label_tracklength = gtk.Label()
+            label_tracklength = Gtk.Label()
+            label_tracklength.set_halign(Gtk.Align.START)
+            label_tracklength.set_hexpand(True)
+            label_tracklength.set_justify(Gtk.Justification.LEFT)            
             tracklength = dict_details['tracklength']
             str_tracklength = self.convert_time(tracklength)
             label_tracklength.set_text(str_tracklength)
             label_tracklength.set_selectable(True)
-            label_tracklength.set_alignment(0, 0.5)
-            table_details.attach(label_tracklength, 1, 2, n, n + 1, False, False, 5, 0)
+            grid_details.attach(
+                child=label_tracklength, 
+                left=1, 
+                top=n, 
+                width=1,
+                height=1
+                )
         
         n += 1
 
-        label_detail_demo = gtk.Label()
-        label_detail_demo.set_alignment(0, 0.5)
+        label_detail_demo = Gtk.Label()
+        label_detail_demo.set_halign(Gtk.Align.START)
+        label_detail_demo.set_hexpand(True)
+        label_detail_demo.set_justify(Gtk.Justification.LEFT)
         label_detail_demo.set_text("Demo: ")
-        table_details.attach(label_detail_demo, 0, 1, n, n + 1, False, False, 5, 0) 
+        grid_details.attach(
+            child=label_detail_demo, 
+            left=0, 
+            top=n, 
+            width=1,
+            height=1
+            )
 
-        label_demo = gtk.Label()
-        label_demo.set_alignment(0, 0.5)
+        label_demo = Gtk.Label()
+        label_demo.set_halign(Gtk.Align.START)
+        label_demo.set_hexpand(True)
+        label_demo.set_justify(Gtk.Justification.LEFT)
         label_demo.set_selectable(True)
         demo = dict_details['demo']
         if not demo:
             demo = 0
         demo = unys[demo]
         label_demo.set_text(demo)
-        table_details.attach(label_demo, 1, 2, n, n + 1, False, False, 5, 0)
+        grid_details.attach(
+            child=label_demo, 
+            left=1, 
+            top=n, 
+            width=1,
+            height=1
+            )
         
         n += 1
         
-        label_detail_compilation = gtk.Label()
-        label_detail_compilation.set_alignment(0, 0.5)
+        label_detail_compilation = Gtk.Label()
+        label_detail_compilation.set_halign(Gtk.Align.START)
+        label_detail_compilation.set_hexpand(True)
+        label_detail_compilation.set_justify(Gtk.Justification.LEFT)
         label_detail_compilation.set_text("Compilation: ")
-        table_details.attach(label_detail_compilation, 0, 1, n, n + 1, False, False, 5, 0)      
+        grid_details.attach(
+            child=label_detail_compilation, 
+            left=0, 
+            top=n, 
+            width=1,
+            height=1
+            )     
 
-        label_compilation = gtk.Label()
-        label_compilation.set_alignment(0, 0.5)
+        label_compilation = Gtk.Label()
+        label_compilation.set_halign(Gtk.Align.START)
+        label_compilation.set_hexpand(True)
+        label_compilation.set_justify(Gtk.Justification.LEFT)
         label_compilation.set_selectable(True)
         compilation = dict_details['compilation']
         compilation = unys[compilation]
         label_compilation.set_text(compilation)
-        table_details.attach(label_compilation, 1, 2, n, n + 1, False, False, 5, 0)
+        grid_details.attach(
+            child=label_compilation, 
+            left=1, 
+            top=n, 
+            width=1,
+            height=1
+            )
         
         n += 1
 
-        label_detail_company = gtk.Label()
-        label_detail_company.set_alignment(0, 0.5)
+        label_detail_company = Gtk.Label()
+        label_detail_company.set_halign(Gtk.Align.START)
+        label_detail_company.set_hexpand(True)
+        label_detail_company.set_justify(Gtk.Justification.LEFT)
         label_detail_company.set_text("Company: ")
-        table_details.attach(label_detail_company, 0, 1, n, n + 1, False, False, 5, 0)      
+        grid_details.attach(
+            child=label_detail_company, 
+            left=0, 
+            top=n, 
+            width=1,
+            height=1
+            )    
         
-        label_company = gtk.Label()
-        label_company.set_alignment(0, 0.5)
+        label_company = Gtk.Label()
+        label_company.set_halign(Gtk.Align.START)
+        label_company.set_hexpand(True)
+        label_company.set_justify(Gtk.Justification.LEFT)
         label_company.set_selectable(True)
         company = dict_details['company']
         if company:
             label_company.set_text(company)
-            table_details.attach(label_company, 1, 2, n, n + 1, False, False, 5, 0)
+        grid_details.attach(
+            child=label_company, 
+            left=1, 
+            top=n, 
+            width=1,
+            height=1
+            )
         
         n += 1
         
-        label_detail_year = gtk.Label()
-        label_detail_year.set_alignment(0, 0.5)
+        label_detail_year = Gtk.Label()
+        label_detail_year.set_halign(Gtk.Align.START)
+        label_detail_year.set_hexpand(True)
+        label_detail_year.set_justify(Gtk.Justification.LEFT)
         label_detail_year.set_text("Release Year: ") 
-        table_details.attach(label_detail_year, 0, 1, n, n + 1, False, False, 5, 0)      
+        grid_details.attach(
+            child=label_detail_year, 
+            left=0, 
+            top=n, 
+            width=1,
+            height=1
+            )   
 
-        label_year = gtk.Label()
-        label_year.set_alignment(0, 0.5)
+        label_year = Gtk.Label()
+        label_year.set_halign(Gtk.Align.START)
+        label_year.set_hexpand(True)
+        label_year.set_justify(Gtk.Justification.LEFT)
         label_year.set_selectable(True)
         year = dict_details['year']
         if year:
             year = str(year)
             label_year.set_text(year) 
-            table_details.attach(label_year, 1, 2, n, n + 1, False, False, 5, 0)
+        grid_details.attach(
+            child=label_year, 
+            left=1, 
+            top=n, 
+            width=1,
+            height=1
+            )
 
         n += 1
 
-        label_detail_cpa = gtk.Label()
-        label_detail_cpa.set_alignment(0, 0.5)
+        label_detail_cpa = Gtk.Label()
+        label_detail_cpa.set_halign(Gtk.Align.START)
+        label_detail_cpa.set_hexpand(True)
+        label_detail_cpa.set_justify(Gtk.Justification.LEFT)
         label_detail_cpa.set_text("Country: ")
-        table_details.attach(label_detail_cpa, 0, 1, n, n + 1, False, False, 5, 0)      
+        grid_details.attach(
+            child=label_detail_cpa, 
+            left=0, 
+            top=n, 
+            width=1,
+            height=1
+            )    
        
-        label_cpa = gtk.Label()
-        label_cpa.set_alignment(0, 0.5)
+        label_cpa = Gtk.Label()
+        label_cpa.set_halign(Gtk.Align.START)
+        label_cpa.set_hexpand(True)
+        label_cpa.set_justify(Gtk.Justification.LEFT)
         label_cpa.set_selectable(True)
         cpa = dict_details['cpa']
         if cpa:
             label_cpa.set_text(cpa)
-            table_details.attach(label_cpa, 1, 2, n, n + 1, False, False, 5, 0)
+        grid_details.attach(
+            child=label_cpa, 
+            left=1, 
+            top=n, 
+            width=1,
+            height=1
+            )
 
         n += 1
 
-        label_detail_genre = gtk.Label()
-        label_detail_genre.set_alignment(0, 0.5)
+        label_detail_genre = Gtk.Label()
+        label_detail_genre.set_halign(Gtk.Align.START)
+        label_detail_genre.set_hexpand(True)
+        label_detail_genre.set_justify(Gtk.Justification.LEFT)
         label_detail_genre.set_text("Genre: ")
-        table_details.attach(label_detail_genre, 0, 1, n, n + 1, False, False, 5, 0)      
+        grid_details.attach(
+            child=label_detail_genre, 
+            left=0, 
+            top=n, 
+            width=1,
+            height=1
+            )  
        
         
-        label_genre = gtk.Label()
-        label_genre.set_alignment(0, 0.5)
+        label_genre = Gtk.Label()
+        label_genre.set_halign(Gtk.Align.START)
+        label_genre.set_hexpand(True)
+        label_genre.set_justify(Gtk.Justification.LEFT)
         label_genre.set_selectable(True)
         genre = dict_details['genre']
         if genre:
             label_genre.set_text(genre)
-            table_details.attach(label_genre, 1, 2, n, n + 1, False, False, 5, 0)
+        grid_details.attach(
+            child=label_genre, 
+            left=1, 
+            top=n, 
+            width=1,
+            height=1
+            )
 
         n += 1
 
-        label_detail_createwho = gtk.Label()
-        label_detail_createwho.set_alignment(0, 0.5)
+        label_detail_createwho = Gtk.Label()
+        label_detail_createwho.set_halign(Gtk.Align.START)
+        label_detail_createwho.set_hexpand(True)
+        label_detail_createwho.set_justify(Gtk.Justification.LEFT)
         label_detail_createwho.set_text("Added By: ")
-        table_details.attach(label_detail_createwho, 0, 1, n, n + 1, False, False, 5, 0)      
+        grid_details.attach(
+            child=label_detail_createwho, 
+            left=0, 
+            top=n, 
+            width=1,
+            height=1
+            )   
        
         
-        label_createwho = gtk.Label()
-        label_createwho.set_alignment(0, 0.5)
+        label_createwho = Gtk.Label()
+        label_createwho.set_halign(Gtk.Align.START)
+        label_createwho.set_hexpand(True)
+        label_createwho.set_justify(Gtk.Justification.LEFT)
         label_createwho.set_selectable(True)
         createwho = dict_details['createwho']
         if createwho:
             createwho = self.dict_creator[createwho]
             label_createwho.set_text(createwho)
-            table_details.attach(label_createwho, 1, 2, n, n + 1, False, False, 5, 0)
+        grid_details.attach(
+            child=label_createwho, 
+            left=1, 
+            top=n, 
+            width=1,
+            height=1
+            )
 
         n += 1
        
-        label_detail_createwhen = gtk.Label()
-        label_detail_createwhen.set_alignment(0, 0.5)
+        label_detail_createwhen = Gtk.Label()
+        label_detail_createwhen.set_halign(Gtk.Align.START)
+        label_detail_createwhen.set_hexpand(True)
+        label_detail_createwhen.set_justify(Gtk.Justification.LEFT)
         label_detail_createwhen.set_text("Date Added: ")
-        table_details.attach(label_detail_createwhen, 0, 1, n, n + 1, False, False, 5, 0)      
+        grid_details.attach(
+            child=label_detail_createwhen, 
+            left=0, 
+            top=n, 
+            width=1,
+            height=1
+            )   
          
-        label_createwhen = gtk.Label()
-        label_createwhen.set_alignment(0, 0.5)
+        label_createwhen = Gtk.Label()
+        label_createwhen.set_halign(Gtk.Align.START)
+        label_createwhen.set_hexpand(True)
+        label_createwhen.set_justify(Gtk.Justification.LEFT)
         label_createwhen.set_selectable(True)
         createwhen = dict_details['createwhen']
         if createwhen:
             createwhen = datetime.datetime.fromtimestamp(createwhen)
             createwhen = createwhen.strftime("%d/%m/%Y")
             label_createwhen.set_text(createwhen)
-            table_details.attach(label_createwhen, 1, 2, n, n + 1, False, False, 5, 0)
+        grid_details.attach(
+            child=label_createwhen, 
+            left=1, 
+            top=n, 
+            width=1,
+            height=1
+            )
 
         n += 1
                 
-        label_detail_id = gtk.Label()
+        label_detail_id = Gtk.Label()
+        label_detail_id.set_halign(Gtk.Align.START)
+        label_detail_id.set_hexpand(True)
+        label_detail_id.set_justify(Gtk.Justification.LEFT)
         label_detail_id.set_text("CD ID Number: ")
-        label_detail_id.set_alignment(0, 0.5)
-        table_details.attach(label_detail_id, 0, 1, n, n + 1, False, False, 5, 0)
+        grid_details.attach(
+            child=label_detail_id, 
+            left=0, 
+            top=n, 
+            width=1,
+            height=1
+            )
         
-        label_id = gtk.Label()
+        label_id = Gtk.Label()
+        label_id.set_halign(Gtk.Align.START)
+        label_id.set_hexpand(True)
+        label_id.set_justify(Gtk.Justification.LEFT)
         cdid = dict_details["cdid"]
         cdid = str(cdid)
         label_id.set_text(cdid)
         label_id.set_selectable(True)
-        label_id.set_alignment(0, 0.5)
-        table_details.attach(label_id, 1, 2, n, n + 1, False, False, 5, 0)
+        grid_details.attach(
+            child=label_id, 
+            left=1, 
+            top=n, 
+            width=1,
+            height=1
+            )
 
         n += 1
 
-        label_detail_comment = gtk.Label()
+        label_detail_comment = Gtk.Label()
+        label_detail_comment.set_halign(Gtk.Align.START)
+        label_detail_comment.set_hexpand(True)
+        label_detail_comment.set_justify(Gtk.Justification.LEFT)
         label_detail_comment.set_text("Comments: ")
-        label_detail_comment.set_alignment(0, 0.5)
-        table_details.attach(label_detail_comment, 0, 1, n, n + 1, False, False, 5, 0)
+        grid_details.attach(
+            child=label_detail_comment, 
+            left=0, 
+            top=n, 
+            width=1,
+            height=1
+            )
 
-        label_comment = gtk.Label()
-        label_comment.set_alignment(0, 0.5)
+        label_comment = Gtk.Label()
+        label_comment.set_halign(Gtk.Align.FILL)
+        label_comment.set_hexpand(True)
         label_comment.set_selectable(True)
+        label_comment.set_max_width_chars(40)
         label_comment.set_line_wrap(True)        
         
         cdcomment = dict_details['comment']
-        if cdcomment:
-            label_comment.set_text(cdcomment)
-            table_details.attach(label_comment, 1, 2, n, n + 1, False, False, 5, 0)
+        createwho = dict_details['createwho']
+        
+        f = base64.b64decode(b'ZnVjaw==').decode()
+        c = base64.b64decode(b'Y3VudA==').decode()
+
+        if cdcomment and (createwho != 60):
+            l = cdcomment.lower()
+            if any(s not in l for s in (f, c)):
+                cdcomment = cdcomment.strip()
+                label_comment.set_text(cdcomment)
+                grid_details.attach(
+                    child=label_comment, 
+                    left=1, 
+                    top=n, 
+                    width=1,
+                    height=1
+                    )
 
         dialog.show_all()
         dialog.run()    
         dialog.destroy()        
 
-    def play_from_menu(self, widget, treeview):
-        dict_data = self.get_details(treeview)        
+    def play_from_menu(self, widget, treeview, track_id):
+        if treeview.get_name() == 'pl':
+            dict_data = self.dict_pl[track_id] 
+        else:
+            dict_data = self.dict_results[track_id]        
         cdid = (dict_data["cdid"])
         cdid = str(cdid).zfill(7)
         tracknum = (dict_data["tracknum"])
         tracknum = str(tracknum).zfill(2)
         
         ID = cdid + "-" + tracknum
-        # print(ID)
         filepath = self.get_filepath(ID)
-        # print(filepath)
+                   
         if filepath:
-            self.player_pre.stop()
-                          
-            self.btn_pre_play_pause.set_image(self.image_pause)
-            self.player_pre.start(filepath)
+            self.player.stop()
+            self.player.set_filepath(filepath)
+            img = self.btn_pre_play_pause.get_image()
+            if img == self.image_play:          
+                self.btn_pre_play_pause.set_image(self.image_pause)
+                self.player.play()
 
         
     def convert_time(self, dur):
+        '''
+        process number into hh:mm:ss
+        '''
         s = int(dur)
         m,s = divmod(s, 60)
 
@@ -1939,20 +2438,28 @@ class List_Maker():
 
     # message dialogs
     def warn_dialog(self, str_warn):
-        m = gtk.MessageDialog(None, 0, 
-                    gtk.MESSAGE_WARNING, gtk.BUTTONS_OK, 
-                    str_warn)
-        m.run()
-        m.destroy()
+        messagedialog = Gtk.MessageDialog(
+            #transient_for=self,
+            flags=0,
+            message_type=Gtk.MessageType.WARNING,
+            buttons=Gtk.ButtonsType.OK,
+            text=str_warn)
+        messagedialog.run()
+        messagedialog.destroy()
     
     def error_dialog(self, str_error):
-        messagedialog = gtk.MessageDialog(None, 0, 
-                    gtk.MESSAGE_ERROR, gtk.BUTTONS_OK, 
-                    str_error)
+        messagedialog = Gtk.MessageDialog(
+            #transient_for=self,
+            flags=0,
+            message_type=Gtk.MessageType.ERROR,
+            buttons=Gtk.ButtonsType.OK,
+            text=str_error
+            )
+
         messagedialog.run()
         messagedialog.destroy()  
+        
 
-    
 lm = List_Maker()
 lm.main()
         
