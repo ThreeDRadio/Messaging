@@ -91,22 +91,54 @@ order_results = {
 }
 
 class SpinnerDialog(Gtk.Dialog):
-
-    def __init__(self, parent):
-        Gtk.Dialog.__init__(self, "Spinner Dialog", parent, 0)
-        self.set_default_size(150, 100)
-
-        # Create a box for the dialog contents
+    '''
+    show spinner and run export
+    '''
+    def __init__(self, parent, filelist, export_file):
+        Gtk.Dialog.__init__(self, "My Dialog", parent, 0, None)
         box = self.get_content_area()
-
-        # Add a spinner widget to the box
         spinner = Gtk.Spinner()
         spinner.start()
         box.add(spinner)
-        label = Gtk.Label(label="Please wait")
+        label = Gtk.Label(label="Exporting playlist, please wait")
         box.add(label)
+        
+        # Connect to the 'delete-event' signal
+        self.connect('delete-event', Gtk.main_quit)
 
+        # Run the time-consuming task in a separate thread
+
+        self.task_thread = threading.Thread(target=self.combine_export, args=[filelist, export_file])
+        self.task_thread.start()
+
+        # Set the dialog to be modal
+        self.set_modal(True)
+
+        # Show the dialog
         self.show_all()
+        
+    def combine_export(self, filelist, export_file):
+        '''
+        subfunction run in thread to create combined export
+        '''
+        print("exporting") 
+        combined = pydub.AudioSegment.empty()
+        
+        for song in filelist:
+            audiosegment = pydub.AudioSegment.from_file(song, format="mp3")
+            combined = combined + audiosegment
+        combined.export(export_file, format="mp3")
+        print("export completed")
+        GLib.idle_add(self.destroy)
+
+
+    def run_task(self):
+        # Simulate a time-consuming task
+        print(self.parameter1)
+        time.sleep(10)
+        print(self.parameter2)
+        # Schedule the dialog to be closed
+        GLib.idle_add(self.destroy)
 
 class List_Maker():
     
@@ -118,8 +150,10 @@ class List_Maker():
             response = self.save_change()
             if response == Gtk.ResponseType.ACCEPT:
                 self.save(None)
+                self.window.destroy()
                 return False
             elif response == Gtk.ResponseType.REJECT:
+                self.window.destroy()
                 return False
             elif response == Gtk.ResponseType.CANCEL:
                 return True
@@ -411,7 +445,7 @@ class List_Maker():
         item_save.connect("activate", self.save)
         item_saveas.connect("activate", self.saveas)
         item_export.connect("activate", self.export)
-        item_quit.connect("activate", self.delete_event)
+        item_quit.connect("activate", self.delete_event, None)
         
         self.treeview_cat.connect('button-release-event' , self.right_click_cat_list_menu)
         self.treeview_pl.connect('button-release-event' , self.right_click_pl_list_menu)
@@ -1512,6 +1546,7 @@ class List_Maker():
         dialog.destroy()
     
         if response == Gtk.ResponseType.OK:
+            self.window.destroy()
             return False
         else:
             return True        
@@ -1637,61 +1672,15 @@ class List_Maker():
             # run the filechooser to select where to save
             action = "save_file"
             name = "Untitled.mp3"  
-            export_file =  self.get_filename(action, name) 
-             
-            # start the export function in its own thread
-            # export_thread = threading.Thread(target=self.combine_export, args=(filelist, export_file))
-            #export_thread.daemon = True
-            # export_thread.start()
-            
-            # start the progress window in its own thread
-            
-            dialog = Gtk.Dialog()
-            dialog.set_default_size(150, 100)
-
-            # Create a box for the dialog contents
-            box = dialog.get_content_area()
-
-            # Add a spinner widget to the box
-            spinner = Gtk.Spinner()
-            spinner.start()
-            box.add(spinner)
-            label = Gtk.Label(label="Exporting playlist, please wait")
-            box.add(label)
-
-            dialog.show_all()
-        
-            
+            export_file =  self.get_filename(action, name)
+            if export_file:
+                dialog = SpinnerDialog(self.window, filelist, export_file)
+            else:
+                message = "Export cancelled"
+                self.error_dialog(message)            
         else:
             message = "You need to have something in the playlist before you can export it"
             self.error_dialog(message)
-    
-        def show_progress():
-            '''
-            subfunction run in thread to indicate export
-            '''
-            print("run the dialog")
-            dialog.run()
-            print("destroy the dialog")
-            GLib.idle_add(dialog.destroy)
-        
-        threading.Thread(target=show_progress).start()
-        
-        def combine_export():
-            '''
-            subfunction run in thread to create combined export
-            '''
-            print("exporting") 
-            combined = pydub.AudioSegment.empty()
-            
-            for song in filelist:
-                audiosegment = pydub.AudioSegment.from_file(song, format="mp3")
-                combined = combined + audiosegment
-            combined.export(export_file, format="mp3")
-            print("export completed")
-            GLib.idle_add(dialog.response, Gtk.ResponseType.OK)
-        
-        threading.Thread(target=combine_export).start()
             
                 
     def pl3d2pylist(self, filename):
