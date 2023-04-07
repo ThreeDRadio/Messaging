@@ -1607,7 +1607,7 @@ class List_Maker():
         if self.name_of_open_file:
             filename = self.name_of_open_file      
             ls_tracklist = self.get_tracklist()
-            pickle.dump(ls_tracklist, open(filename, "wb"))
+            pickle.dump(ls_tracklist, open(filename, "wb"), protocol=0)
 
         else:
             action = "save_file"
@@ -1620,7 +1620,7 @@ class List_Maker():
             if filename: 
                 ls_tracklist = self.get_tracklist()
                 try: 
-                    pickle.dump(ls_tracklist, open(filename, "wb"))
+                    pickle.dump(ls_tracklist, open(filename, "wb"), protocol=0)
                     self.changed = False
                     self.name_of_open_file = filename
                     self.Saved = True
@@ -1648,7 +1648,7 @@ class List_Maker():
             self.changed = False
             
             ls_tracklist = self.get_tracklist()
-            pickle.dump(ls_tracklist, open(filename, "wb"))
+            pickle.dump(ls_tracklist, open(filename, "wb"), protocol=0)
             self.name_of_open_file = filename
 
     def export(self, widget):
