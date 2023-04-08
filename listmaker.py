@@ -590,13 +590,13 @@ class List_Maker():
             width=1,
             height=1
             )
-        grid_cat.attach(
-            child=self.chk_search_aus,
-            left=1,
-            top=9,
-            width=2,
-            height=1
-            )
+        #grid_cat.attach(
+        #    child=self.chk_search_aus,
+        #    left=1,
+        #    top=9,
+        #    width=2,
+        #    height=1
+        #    )
         grid_cat.attach(
             child=self.chk_search_fem,
             left=0,
@@ -607,7 +607,7 @@ class List_Maker():
         grid_cat.attach(
             child=self.chk_search_nr,
             left=1,
-            top=10,
+            top=9,
             width=2,
             height=1
             )
@@ -621,7 +621,7 @@ class List_Maker():
         grid_cat.attach(
             child=self.chk_search_comp	,
             left=1,
-            top=11,
+            top=10,
             width=2,
             height=1
             )
