@@ -95,7 +95,7 @@ class SpinnerDialog(Gtk.Dialog):
     show spinner and run export
     '''
     def __init__(self, parent, filelist, export_file):
-        Gtk.Dialog.__init__(self, "My Dialog", parent, 0, None)
+        Gtk.Dialog.__init__(self, "Working...", parent, 0, None)
         box = self.get_content_area()
         spinner = Gtk.Spinner()
         spinner.start()
@@ -1608,6 +1608,8 @@ class List_Maker():
             filename = self.name_of_open_file      
             ls_tracklist = self.get_tracklist()
             pickle.dump(ls_tracklist, open(filename, "wb"), protocol=0)
+            self.changed = False
+            self.Saved = True
 
         else:
             action = "save_file"
@@ -2398,7 +2400,7 @@ class List_Maker():
             img = self.btn_pre_play_pause.get_image()
             if img == self.image_play:          
                 self.btn_pre_play_pause.set_image(self.image_pause)
-                self.player.play()
+            self.player.play()
 
         
     def convert_time(self, dur):
