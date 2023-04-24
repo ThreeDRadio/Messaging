@@ -30,8 +30,8 @@ import json
 from lxml import etree
 import pydub
 
-import player
-from player import Player
+import gst_player
+from gst_player import Player
 
 
 #get variables from config file
@@ -78,8 +78,7 @@ select_items = (
     "cdtrack.tracktitle",
     "cdtrack.trackartist",
     "cdtrack.tracklength",
-    "cdcomment.comment",
-    "cdcomment.createwho"
+    "cdcomment.comment"
     )
 
 order_results = {
@@ -121,23 +120,14 @@ class SpinnerDialog(Gtk.Dialog):
         '''
         subfunction run in thread to create combined export
         '''
-        print("exporting") 
+        #print("exporting") 
         combined = pydub.AudioSegment.empty()
         
         for song in filelist:
             audiosegment = pydub.AudioSegment.from_file(song, format="mp3")
             combined = combined + audiosegment
         combined.export(export_file, format="mp3")
-        print("export completed")
-        GLib.idle_add(self.destroy)
-
-
-    def run_task(self):
-        # Simulate a time-consuming task
-        print(self.parameter1)
-        time.sleep(10)
-        print(self.parameter2)
-        # Schedule the dialog to be closed
+        #print("export completed")
         GLib.idle_add(self.destroy)
 
 class List_Maker():
@@ -185,7 +175,7 @@ class List_Maker():
         
         # vbox for catalogue search
         vbox_cat_search = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
-        vbox_cat_search.set_margin_left(5)
+        vbox_cat_search.set_margin_start(5)
         # table for music catalogue search
         grid_cat = Gtk.Grid(hexpand=False, vexpand=False)
         grid_cat.set_valign(Gtk.Align.FILL)
@@ -212,7 +202,7 @@ class List_Maker():
         hbox_pre_btn = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
         # vbox for playlist
         vbox_pl = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
-        vbox_pl.set_margin_right(5)
+        vbox_pl.set_margin_end(5)
         # hbox for list option buttons in the playlist
         hbox_pl = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
         
@@ -822,7 +812,7 @@ class List_Maker():
             cdid = str(format(dict_track['cdid'], '07d'))
             tracknum = str(format(dict_track['tracknum'], '02d'))
             filename = cdid + "-" + tracknum
-            print(filename)
+            #print(filename)
             filepath = self.get_filepath(filename)
             if not filepath:
                  str_error = "Unable to add to the list, file does not exist. That track has probably not yet been ripped into the music store"
@@ -1011,6 +1001,10 @@ class List_Maker():
                 select_statement = sql.SQL(' ').join([select_statement, identifier])
             else:
                 select_statement = sql.SQL(', ').join([select_statement, identifier])
+                
+        as_statement = sql.SQL("cdcomment.createwho AS cdcreator")
+        
+        select_statement = sql.SQL(', ').join([select_statement, as_statement])
         
         from_statement = sql.SQL("FROM {} INNER JOIN {} ON {}.{}={}.{} LEFT OUTER JOIN {} ON {}.{}={}.{}").format(
         sql.Identifier("cdtrack"),
@@ -1090,8 +1084,6 @@ class List_Maker():
 
         query = sql.SQL(' ').join([select_statement, from_statement, where_statement, order_statement, limit_statement])
         return query
-        
-
         
     def execute_query(self, query, search_terms):
         conn = self.pg_connect_cat()
@@ -1240,6 +1232,8 @@ class List_Maker():
             var_album = album
             
             self.dict_results[track_id] = item
+            #print("self.dict_results")
+            #print(self.dict_results)
         
     def get_dict_creator(self):
         '''
@@ -2359,12 +2353,12 @@ class List_Maker():
         label_comment.set_line_wrap(True)        
         
         cdcomment = dict_details['comment']
-        createwho = dict_details['createwho']
+        cdcreator = dict_details['cdcreator']
         
         f = base64.b64decode(b'ZnVjaw==').decode()
         c = base64.b64decode(b'Y3VudA==').decode()
 
-        if cdcomment and (createwho != 60):
+        if cdcomment and (cdcreator != 60):
             l = cdcomment.lower()
             if any(s not in l for s in (f, c)):
                 cdcomment = cdcomment.strip()
