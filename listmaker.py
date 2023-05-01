@@ -303,11 +303,11 @@ class List_Maker():
         self.dict_results = {}
         
         # button to expand or collapse all in treeview
-        button_expand = Gtk.Button(
+        self.button_expand = Gtk.Button(
             label="Expand All",
             halign=Gtk.Align.START
             )
-        button_expand.connect("clicked", self.expand_collapse)
+        self.button_expand.connect("clicked", self.expand_collapse)
         
         ### ------------ Preview Section ------------  ###
 
@@ -442,7 +442,7 @@ class List_Maker():
         
         ### do the packing ###
 
-        hbox_pre_btn.pack_start(button_expand, False, False, 5)
+        hbox_pre_btn.pack_start(self.button_expand, False, False, 5)
         hbox_pre_btn.pack_start(self.btn_pre_play_pause, False, False, 0)
         hbox_pre_btn.pack_start(btn_pre_stop, False, False, 0)
         hbox_pre_btn.pack_start(self.hscale_pre, True, True, 0)
@@ -878,12 +878,14 @@ class List_Maker():
             self.length_check(result)
             list_dict_data = self.process_result(result)
             self.add_to_cat_store(list_dict_data)
+            self.button_expand.set_label("Expand All")
             
         else:
             self.clear_cat_list()
             int_res = 0
             self.update_result_label(int_res)
-    
+            self.button_expand.set_label("Expand All")
+
     def get_search_terms(self):
         '''
         Make a query to the catalogue database based on the user input. 
@@ -1358,7 +1360,7 @@ class List_Maker():
         '''
         playstatus = self.player.get_state()     
         if (playstatus == Gst.State.PLAYING) or (playstatus == Gst.State.PAUSED):
-            self.player.stop()
+            self.on_stop_clicked(None)
 
     # playlist section
     def update_time_total(self):
